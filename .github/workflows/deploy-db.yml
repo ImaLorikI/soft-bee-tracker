@@ -23,15 +23,17 @@ jobs:
     needs: [validate]
     runs-on: ubuntu-latest
     environment: production
+    # SUPABASE_DB_URL must be the Session pooler URI (*.pooler.supabase.com:5432).
+    # Direct db.<ref>.supabase.co is IPv6-only on many projects and fails on Actions with ECONNREFUSED.
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
+        uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with:
           version: 2.116.0
 
@@ -40,6 +42,25 @@ jobs:
           if [ -z "$SUPABASE_DB_URL" ]; then
             echo "Error: secret SUPABASE_DB_URL is not set in the 'production' environment"
             echo "Missing secret \`SUPABASE_DB_URL\` in the \`production\` environment" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Host only — never echo the full URL (contains the DB password).
+          DB_HOST="$(python3 -c "import os, urllib.parse as u; print(u.urlparse(os.environ['SUPABASE_DB_URL']).hostname or '')")"
+          if [ -z "$DB_HOST" ]; then
+            echo "Error: SUPABASE_DB_URL is not a valid connection URI"
+            echo "Invalid \`SUPABASE_DB_URL\` (could not parse host)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [[ "$DB_HOST" == db.*.supabase.co ]]; then
+            echo "Error: SUPABASE_DB_URL uses Direct host ($DB_HOST)."
+            echo "Use Session pooler from Dashboard → Connect (host like aws-*-*.pooler.supabase.com, port 5432)."
+            echo "Direct \`db.*.supabase.co\` fails on GitHub Actions (IPv6 ECONNREFUSED)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [[ "$DB_HOST" != *.pooler.supabase.com ]]; then
+            echo "Error: SUPABASE_DB_URL host must be Session pooler (*.pooler.supabase.com), got: $DB_HOST"
+            echo "Expected Session pooler host \`*.pooler.supabase.com\`, got \`$DB_HOST\`" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
