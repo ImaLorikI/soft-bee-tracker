@@ -8,6 +8,8 @@ on:
     branches: [main, dev]
   push:
     branches: [main, dev]
+  schedule:
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +47,26 @@ jobs:
           YARN_ENABLE_HARDENED_MODE: 'true'
         run: yarn install --immutable --mode=skip-build
 
+      # PRs that don't touch dependencies skip the audit so a newly published
+      # advisory can't fail unrelated PRs; the schedule and pushes still catch it.
+      # A git diff error (exit > 1) falls through to auditing.
+      - name: Check whether dependencies changed
+        id: deps
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && \
+            git diff --quiet "$BASE_SHA"..."$HEAD_SHA" -- package.json yarn.lock .yarnrc.yml .yarn; then
+            echo "audit=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency changes in this PR; skipping audit."
+          else
+            echo "audit=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Audit for high/critical vulnerabilities
+        if: steps.deps.outputs.audit == 'true'
         run: |
           echo "Running yarn npm audit for high and critical severity..."
           if ! yarn npm audit --severity high --recursive 2>&1; then

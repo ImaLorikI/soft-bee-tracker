@@ -29,7 +29,7 @@ for sha in "$BASE" "$HEAD"; do
 done
 
 CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE"..."$HEAD" -- \
-  '*.js' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.jsx')
+  '*.js' '*.mjs' '*.cjs' '*.ts' '*.tsx' '*.jsx' ':!.yarn/**')
 
 if [ -z "$CHANGED" ]; then
   echo "No JS/TS files changed."
