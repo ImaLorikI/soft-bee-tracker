@@ -39,6 +39,7 @@ describe('projects requests', () => {
 
   it('preserves the Supabase response status when loading fails', async () => {
     createBrowserClient.mockReturnValue({
+      auth: { getClaims: claimsFor('user-1', 'admin') },
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockResolvedValue({
           data: null,
@@ -52,6 +53,38 @@ describe('projects requests', () => {
       message: 'Forbidden',
       statusCode: 403
     });
+  });
+
+  it('returns no projects when there is no session', async () => {
+    createBrowserClient.mockReturnValue({
+      auth: { getClaims: vi.fn().mockResolvedValue({ data: null, error: null }) },
+      from: vi.fn()
+    });
+
+    await expect(getProjects()).resolves.toEqual([]);
+  });
+
+  it.each(['worker', 'manager', null])('filters projects to ones the signed-in user is on when the role is %s', async (role) => {
+    const eq = vi.fn().mockResolvedValue({ data: [{ project_id: 'project-1' }], error: null, status: 200 });
+    const or = vi.fn().mockResolvedValue({ data: [{ ...projectRow, manager_id: 'user-1' }], error: null, status: 200 });
+    const from = vi.fn((table: string) => {
+      if (table === 'project_rates') {
+        return { select: vi.fn().mockReturnValue({ eq }) };
+      }
+
+      return { select: vi.fn().mockReturnValue({ or }) };
+    });
+    createBrowserClient.mockReturnValue({
+      auth: { getClaims: claimsFor('user-1', role) },
+      from
+    });
+
+    const projects = await getProjects();
+
+    expect(eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(or).toHaveBeenCalledWith('manager_id.eq.user-1,id.in.(project-1)');
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.managerId).toBe('user-1');
   });
 
   it('filters user projects by the authenticated manager id', async () => {
@@ -160,6 +193,7 @@ describe('projects requests', () => {
 
   it('combines projects with their members into page records', async () => {
     createBrowserClient.mockReturnValue({
+      auth: { getClaims: claimsFor('manager-2', 'admin') },
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockResolvedValue({ data: [{ ...projectRow, note: 'Scope' }], error: null, status: 200 })
       }),
@@ -234,3 +268,10 @@ describe('projects requests', () => {
     });
   });
 });
+
+function claimsFor(userId: string, role: string | null) {
+  return vi.fn().mockResolvedValue({
+    data: { claims: { sub: userId, user_role: role } },
+    error: null
+  });
+}

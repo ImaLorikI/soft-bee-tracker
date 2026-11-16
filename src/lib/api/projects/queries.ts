@@ -2,8 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getSessionViewer } from '@/lib/api/auth/viewer';
 import { mapProjectMemberRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, toProjectRecords } from '@/lib/api/projects/mappers';
 import type { MemberProject, Project, ProjectMember, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
+import { fetchVisibleProjects } from '@/lib/api/projects/visible-projects';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 
@@ -18,18 +20,30 @@ export const projectKeys = {
 
 const STATUS_ORDER: Record<ProjectStatus, number> = { active: 0, archived: 1 };
 
+// admins see every project. everyone else sends the same predicate rls already
+// enforces (responsible or assigned), so postgres does not scan the whole table.
 export async function getProjects(): Promise<Project[]> {
   const supabase = createBrowserClient();
-  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
+  const viewer = await getSessionViewer(supabase);
 
-  if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+  if (!viewer) {
+    return [];
   }
 
-  return mapProjectsRowsToProjects(data);
+  if (viewer.role === 'admin') {
+    const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
+
+    if (error) {
+      throw {
+        message: error.message,
+        statusCode: status
+      } satisfies ApiError;
+    }
+
+    return mapProjectsRowsToProjects(data ?? []);
+  }
+
+  return fetchVisibleProjects(supabase, viewer.id);
 }
 
 export async function getUserProjects(): Promise<Project[]> {
@@ -76,28 +90,9 @@ export async function getMyProjects(): Promise<MemberProject[]> {
     return [];
   }
 
-  const userId = userData.user.id;
-  const rates = await supabase.from('project_rates').select('project_id').eq('user_id', userId);
+  const projects = await fetchVisibleProjects(supabase, userData.user.id);
 
-  if (rates.error) {
-    throw {
-      message: rates.error.message,
-      statusCode: rates.status
-    } satisfies ApiError;
-  }
-
-  const memberProjectIds = [...new Set(rates.data.map((rate) => rate.project_id))];
-  const filter = memberProjectIds.length > 0 ? `manager_id.eq.${userId},id.in.(${memberProjectIds.join(',')})` : `manager_id.eq.${userId}`;
-  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).or(filter);
-
-  if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
-  }
-
-  return toMemberProjects(mapProjectsRowsToProjects(data), userId);
+  return toMemberProjects(projects, userData.user.id);
 }
 
 export function toMemberProjects(projects: Project[], userId: string): MemberProject[] {

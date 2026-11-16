@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { rpc, from } = vi.hoisted(() => ({
+const { rpc, from, getClaims } = vi.hoisted(() => ({
   rpc: vi.fn(),
-  from: vi.fn()
+  from: vi.fn(),
+  getClaims: vi.fn()
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: () => Promise.resolve({ rpc, from })
+  createServerClient: () => Promise.resolve({ rpc, from, auth: { getClaims } })
 }));
 
 // node-only unit test of the server helper; the rule guards client bundles
@@ -16,6 +17,7 @@ import { getReportSource } from '@/lib/api/reports/server';
 describe('getReportSource', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getClaims.mockResolvedValue({ data: { claims: { sub: 'u2', user_role: 'admin' } }, error: null });
   });
 
   it('maps time, leave, people and projects for the range', async () => {
@@ -40,6 +42,52 @@ describe('getReportSource', () => {
     mockRpc({ get_project_members: { data: null, error: { message: 'permission denied' }, status: 403 } });
 
     await expect(getReportSource(RANGE)).rejects.toEqual({ message: 'permission denied', statusCode: 403 });
+  });
+
+  it('scopes a worker to their own leave and projects', async () => {
+    getClaims.mockResolvedValue({ data: { claims: { sub: 'u3', user_role: 'worker' } }, error: null });
+    const leave = queryBuilder(ok([{ id: 'a1', user_id: 'u3', leave_type: 'vacation', start_date: '2026-11-10', end_date: '2026-11-11' }]));
+    const rates = queryBuilder(ok([{ project_id: 'p1' }]));
+    const projects = queryBuilder(ok([projectRow]));
+    from.mockImplementation((table: string) => ({
+      select: () => {
+        if (table === 'leave_requests') {
+          return leave;
+        }
+
+        return table === 'project_rates' ? rates : projects;
+      }
+    }));
+    mockRpc({});
+
+    await getReportSource(RANGE);
+
+    expect(leave.eq).toHaveBeenCalledWith('user_id', 'u3');
+    expect(rates.eq).toHaveBeenCalledWith('user_id', 'u3');
+    expect(projects.or).toHaveBeenCalledWith('manager_id.eq.u3,id.in.(p1)');
+  });
+
+  it('keeps team leave for a manager and still scopes projects', async () => {
+    getClaims.mockResolvedValue({ data: { claims: { sub: 'u2', user_role: 'manager' } }, error: null });
+    const leave = queryBuilder(ok([]));
+    const rates = queryBuilder(ok([{ project_id: 'p1' }]));
+    const projects = queryBuilder(ok([projectRow]));
+    from.mockImplementation((table: string) => ({
+      select: () => {
+        if (table === 'leave_requests') {
+          return leave;
+        }
+
+        return table === 'project_rates' ? rates : projects;
+      }
+    }));
+    mockRpc({});
+
+    await getReportSource(RANGE);
+
+    expect(leave.eq).toHaveBeenCalledWith('status', 'approved');
+    expect(leave.eq).not.toHaveBeenCalledWith('user_id', 'u2');
+    expect(projects.or).toHaveBeenCalledWith('manager_id.eq.u2,id.in.(p1)');
   });
 });
 
@@ -67,23 +115,7 @@ function mockTables() {
       Promise.resolve(ok([{ id: 'a1', user_id: 'u3', leave_type: 'vacation', start_date: '2026-11-10', end_date: '2026-11-11' }]))
     )
   };
-  const projectsResult = ok([
-    {
-      id: 'p1',
-      created_at: '',
-      updated_at: '2026-11-01T00:00:00Z',
-      name: 'Fundayo',
-      client: '',
-      note: null,
-      picture_url: null,
-      start_date: null,
-      end_date: null,
-      status: 'active',
-      type: 'time_material',
-      manager_id: 'u2',
-      links: []
-    }
-  ]);
+  const projectsResult = ok([projectRow]);
 
   from.mockImplementation((table: string) => ({
     select: () => (table === 'leave_requests' ? leaveQuery : Promise.resolve(projectsResult))
@@ -92,9 +124,44 @@ function mockTables() {
   return leaveQuery;
 }
 
+function queryBuilder(result: QueryResult) {
+  const builder = {
+    eq: vi.fn(),
+    lte: vi.fn(),
+    gte: vi.fn(),
+    or: vi.fn(),
+    then(onFulfilled: (value: QueryResult) => unknown, onRejected?: (reason: unknown) => unknown) {
+      return Promise.resolve(result).then(onFulfilled, onRejected);
+    }
+  };
+
+  builder.eq.mockReturnValue(builder);
+  builder.lte.mockReturnValue(builder);
+  builder.gte.mockReturnValue(builder);
+  builder.or.mockReturnValue(builder);
+
+  return builder;
+}
+
 function ok(data: object[]): QueryResult {
   return { data, error: null, status: 200 };
 }
+
+const projectRow = {
+  id: 'p1',
+  created_at: '',
+  updated_at: '2026-11-01T00:00:00Z',
+  name: 'Fundayo',
+  client: '',
+  note: null,
+  picture_url: null,
+  start_date: null,
+  end_date: null,
+  status: 'active',
+  type: 'time_material',
+  manager_id: 'u2',
+  links: []
+};
 
 const RANGE = { from: '2026-11-09', to: '2026-11-15' };
 
