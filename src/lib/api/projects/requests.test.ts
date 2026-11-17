@@ -142,7 +142,7 @@ describe('projects requests', () => {
     });
   });
 
-  it('adds and removes members through project_rates', async () => {
+  it('adds and removes members through project_members', async () => {
     const insert = vi.fn().mockResolvedValue({ error: null, status: 201 });
     const eqUser = vi.fn().mockResolvedValue({ error: null, status: 204 });
     const eqProject = vi.fn().mockReturnValue({ eq: eqUser });
@@ -152,27 +152,26 @@ describe('projects requests', () => {
     await addProjectMember({ projectId: 'project-1', userId: 'user-2' });
     await removeProjectMember({ projectId: 'project-1', userId: 'user-2' });
 
-    expect(from).toHaveBeenCalledWith('project_rates');
+    expect(from).toHaveBeenCalledWith('project_members');
+    expect(from).not.toHaveBeenCalledWith('project_rates');
     expect(insert).toHaveBeenCalledWith({ project_id: 'project-1', user_id: 'user-2' });
     expect(eqProject).toHaveBeenCalledWith('project_id', 'project-1');
     expect(eqUser).toHaveBeenCalledWith('user_id', 'user-2');
   });
 
-  it('combines projects with their members into page records', async () => {
-    createBrowserClient.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({ data: [{ ...projectRow, note: 'Scope' }], error: null, status: 200 })
-      }),
-      rpc: vi.fn().mockResolvedValue({
-        data: [
-          { project_id: 'project-1', user_id: 'manager-2' },
-          { project_id: 'project-1', user_id: 'user-3' },
-          { project_id: 'project-9', user_id: 'user-3' }
-        ],
-        error: null,
-        status: 200
-      })
+  it('loads projects with their members in one join', async () => {
+    const select = vi.fn().mockResolvedValue({
+      data: [
+        {
+          ...projectRow,
+          note: 'Scope',
+          project_members: [{ user_id: 'manager-2' }, { user_id: 'user-3' }]
+        }
+      ],
+      error: null,
+      status: 200
     });
+    createBrowserClient.mockReturnValue({ from: vi.fn().mockReturnValue({ select }) });
 
     await expect(getProjectRecords()).resolves.toEqual([
       {
@@ -187,6 +186,9 @@ describe('projects requests', () => {
         updatedAt: '2026-08-20T10:00:00.000Z'
       }
     ]);
+    expect(select).toHaveBeenCalledWith(
+      'id, created_at, updated_at, name, client, note, picture_url, start_date, end_date, status, type, manager_id, links, project_members(user_id)'
+    );
   });
 
   it('updates only the status of the requested project', async () => {

@@ -7,7 +7,7 @@ import {
   CREW_LEAVE_ALLOWANCE_COLUMNS,
   CREW_LEAVE_REQUEST_COLUMNS,
   CREW_PROJECT_COLUMNS,
-  CREW_PROJECT_RATE_COLUMNS,
+  CREW_PROJECT_MEMBER_COLUMNS,
   CREW_USER_COLUMNS,
   getCrewTrackerStartDate
 } from '@/lib/api/crew/mappers';
@@ -25,16 +25,16 @@ export const crewKeys = {
 export async function getCrew(): Promise<Crew> {
   const supabase = createBrowserClient();
   const now = new Date();
-  const [users, projects, projectRates, trackers, leaveRequests, allowances] = await Promise.all([
+  const [users, projects, projectMembers, trackers, leaveRequests, allowances] = await Promise.all([
     supabase.from('users').select(CREW_USER_COLUMNS),
     supabase.from('projects').select(CREW_PROJECT_COLUMNS),
-    supabase.from('project_rates').select(CREW_PROJECT_RATE_COLUMNS),
+    supabase.from('project_members').select(CREW_PROJECT_MEMBER_COLUMNS),
     supabase.from('trackers').select(TRACKER_COLUMNS).gte('date', getCrewTrackerStartDate(now)),
     supabase.from('leave_requests').select(CREW_LEAVE_REQUEST_COLUMNS).order('start_date', { ascending: true }),
     supabase.from('leave_allowances').select(CREW_LEAVE_ALLOWANCE_COLUMNS)
   ]);
 
-  for (const result of [users, projects, projectRates, trackers, leaveRequests, allowances]) {
+  for (const result of [users, projects, projectMembers, trackers, leaveRequests, allowances]) {
     if (result.error) {
       throw {
         message: result.error.message,
@@ -47,7 +47,7 @@ export async function getCrew(): Promise<Crew> {
     {
       users: users.data ?? [],
       projects: projects.data ?? [],
-      projectRates: projectRates.data ?? [],
+      projectMembers: projectMembers.data ?? [],
       trackers: mapTrackersRowsToTrackers(trackers.data ?? []),
       leaveRequests: leaveRequests.data ?? [],
       allowances: allowances.data ?? []

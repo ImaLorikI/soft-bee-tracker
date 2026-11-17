@@ -38,11 +38,6 @@ export interface ProjectRecord {
   updatedAt: string;
 }
 
-export interface ProjectMember {
-  projectId: string;
-  userId: string;
-}
-
 export type ProjectMembership = 'manager' | 'member';
 
 export interface MemberProject {
