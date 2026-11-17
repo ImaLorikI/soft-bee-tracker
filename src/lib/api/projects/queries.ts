@@ -86,7 +86,7 @@ export async function getMyProjects(): Promise<MemberProject[]> {
     } satisfies ApiError;
   }
 
-  const memberProjectIds = [...new Set(memberships.data.map((membership) => membership.project_id))];
+  const memberProjectIds = [...new Set((memberships.data ?? []).map((membership) => membership.project_id))];
   const filter = memberProjectIds.length > 0 ? `manager_id.eq.${userId},id.in.(${memberProjectIds.join(',')})` : `manager_id.eq.${userId}`;
   const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).or(filter);
 

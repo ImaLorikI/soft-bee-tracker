@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { crewKeys } from '@/lib/api/crew/queries';
 import { mapCreateProjectArgs, mapProjectChangesToRow, mapProjectRowToProject, PROJECT_COLUMNS } from '@/lib/api/projects/mappers';
@@ -122,7 +122,7 @@ function useProjectMutation<TInput, TResult>(mutationFn: (input: TInput) => Prom
 
   return useMutation<TResult, ApiError, TInput>({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.all })
+    onSuccess: () => invalidateProjectAndCrew(queryClient)
   });
 }
 
@@ -133,7 +133,15 @@ function useProjectMemberMutation(mutationFn: (input: ProjectMemberInput) => Pro
 
   return useMutation<void, ApiError, ProjectMemberInput>({
     mutationFn,
-    onSuccess: () =>
-      Promise.all([queryClient.invalidateQueries({ queryKey: projectKeys.all }), queryClient.invalidateQueries({ queryKey: crewKeys.all })])
+    onSuccess: () => invalidateProjectAndCrew(queryClient)
   });
+}
+
+// crew reads projects and project_members. creating or updating a project rewrites
+// those rows, including the responsible manager's membership.
+function invalidateProjectAndCrew(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: projectKeys.all }),
+    queryClient.invalidateQueries({ queryKey: crewKeys.all })
+  ]);
 }
