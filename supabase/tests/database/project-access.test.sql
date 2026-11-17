@@ -107,12 +107,15 @@ select throws_ok(
   'a rate row can only change its rate'
 );
 
-select throws_ok(
-  $$update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'
-    where project_id = '00000000-0000-0000-0000-00000000fb01'
-      and user_id = '00000000-0000-0000-0000-000000000a03'$$,
-  '42501',
-  null,
+update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'
+where project_id = '00000000-0000-0000-0000-00000000fb01'
+  and user_id = '00000000-0000-0000-0000-000000000a03';
+
+select is(
+  (select user_id::text from public.project_members
+   where project_id = '00000000-0000-0000-0000-00000000fb01'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  '00000000-0000-0000-0000-000000000a03',
   'membership cannot be updated'
 );
 
