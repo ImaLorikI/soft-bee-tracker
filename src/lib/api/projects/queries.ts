@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getSignedInUserId } from '@/lib/api/auth/queries';
 import { mapProjectMemberRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, toProjectRecords } from '@/lib/api/projects/mappers';
 import type { MemberProject, Project, ProjectMember, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -34,21 +35,13 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getUserProjects(): Promise<Project[]> {
   const supabase = createBrowserClient();
+  const userId = await getSignedInUserId();
 
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw {
-      message: userError.message,
-      statusCode: userError.status ?? 401
-    } satisfies ApiError;
-  }
-
-  if (!userData.user) {
+  if (!userId) {
     return [];
   }
 
-  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).eq('manager_id', userData.user.id);
+  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).eq('manager_id', userId);
 
   if (error) {
     throw {
@@ -63,20 +56,12 @@ export async function getUserProjects(): Promise<Project[]> {
 // a user belongs to a project when they manage it or hold a rate on it
 export async function getMyProjects(): Promise<MemberProject[]> {
   const supabase = createBrowserClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = await getSignedInUserId();
 
-  if (userError) {
-    throw {
-      message: userError.message,
-      statusCode: userError.status ?? 401
-    } satisfies ApiError;
-  }
-
-  if (!userData.user) {
+  if (!userId) {
     return [];
   }
 
-  const userId = userData.user.id;
   const rates = await supabase.from('project_rates').select('project_id').eq('user_id', userId);
 
   if (rates.error) {
