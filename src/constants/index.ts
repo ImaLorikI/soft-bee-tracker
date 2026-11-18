@@ -12,7 +12,6 @@ export const ROUTES = {
   ACCESS_DENIED: '/access-denied',
   BLOCKED: '/blocked',
   TERMS: '/terms',
-  DASHBOARD: '/dashboard',
   PROJECTS: '/projects',
   TRACKER: '/tracker',
   CREW: '/crew',
@@ -20,7 +19,7 @@ export const ROUTES = {
   PROFILE: '/profile'
 } as const;
 
-// where the app starts for a signed-in user (/ and /dashboard redirect here)
+// where the app starts for a signed-in user (/ redirects here)
 export const HOME_ROUTE = ROUTES.TRACKER;
 
 // reachable without a session; signed-in users are bounced from GUEST_ONLY_ROUTES_LIST
