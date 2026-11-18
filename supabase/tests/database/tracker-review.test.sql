@@ -1,6 +1,23 @@
 begin;
 
-select plan(24);
+select plan(29);
+
+-- returns the hint of the error a statement raises (null when it succeeds). the app maps
+-- these stable keys, so tests assert them instead of message text. runs as the caller.
+create function pg_temp.review_hint(statement text)
+returns text
+language plpgsql
+as $fn$
+declare
+  error_hint text;
+begin
+  execute statement;
+  return null;
+exception when others then
+  get stacked diagnostics error_hint = pg_exception_hint;
+  return error_hint;
+end;
+$fn$;
 
 -- seeded: admin a01, manager a02 (responsible for b01), worker a03 (assigned to b01).
 -- entries are written as a trusted session in the current (open) month
@@ -16,6 +33,12 @@ insert into public.trackers (id, date, duration_minutes, is_live, live_status, s
 values
   ('00000000-0000-0000-0000-00000000e006', current_date, 0, true, 'start', now(), '00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03');
 
+-- the manager's own entry, already approved by the admin
+insert into public.trackers (id, date, duration_minutes, status, reviewed_by, reviewed_at, project_id, user_id)
+values
+  ('00000000-0000-0000-0000-00000000e007', current_date, 60, 'approved', '00000000-0000-0000-0000-000000000a01', now(),
+   '00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a02');
+
 set local role authenticated;
 
 -- worker
@@ -28,10 +51,9 @@ select throws_ok(
   'a worker cannot approve an entry'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'rejected', review_note = 'no' where id = '00000000-0000-0000-0000-00000000e003'$$,
-  '42501',
-  null,
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'rejected', review_note = 'no' where id = '00000000-0000-0000-0000-00000000e003'$$),
+  'tracker_review.not_reviewer',
   'a worker cannot reject an entry'
 );
 
@@ -70,18 +92,25 @@ select is(
   'approval stamps the reviewer and time'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'rejected' where id = '00000000-0000-0000-0000-00000000e002'$$,
-  '23514',
-  'Add a reason to reject this time entry.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'rejected' where id = '00000000-0000-0000-0000-00000000e002'$$),
+  'tracker_review.reason_required',
   'rejecting needs a reason'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'rejected', review_note = '   ' where id = '00000000-0000-0000-0000-00000000e002'$$,
-  '23514',
-  'Add a reason to reject this time entry.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'rejected', review_note = '   ' where id = '00000000-0000-0000-0000-00000000e002'$$),
+  'tracker_review.reason_required',
   'a blank reason is not a reason'
+);
+
+select is(
+  pg_temp.review_hint(format(
+    $$update public.trackers set status = 'rejected', review_note = %L where id = '00000000-0000-0000-0000-00000000e002'$$,
+    repeat('a', 501)
+  )),
+  'tracker_review.reason_too_long',
+  'a reason over 500 characters gets its own key, not a raw constraint error'
 );
 
 select lives_ok(
@@ -95,39 +124,52 @@ select is(
   'rejection stores the trimmed reason and the reviewer'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'rejected', review_note = 'changed my mind' where id = '00000000-0000-0000-0000-00000000e001'$$,
-  '23514',
-  'Undo the current review before changing it.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'rejected', review_note = 'changed my mind' where id = '00000000-0000-0000-0000-00000000e001'$$),
+  'tracker_review.invalid_transition',
   'an approved entry cannot jump straight to rejected'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e004'$$,
-  '42501',
-  'You cannot review your own time entries.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e004'$$),
+  'tracker_review.own_entry',
   'a manager cannot approve their own entry'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e005'$$,
-  '42501',
-  'Only an admin can review this time entry.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e005'$$),
+  'tracker_review.admin_entry',
   'a manager cannot approve an admin entry'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'approved', duration_minutes = 600 where id = '00000000-0000-0000-0000-00000000e003'$$,
-  '23514',
-  'A review cannot change the entry itself.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'approved', duration_minutes = 600 where id = '00000000-0000-0000-0000-00000000e003'$$),
+  'tracker_review.entry_changed',
   'a review cannot carry other edits'
 );
 
-select throws_ok(
-  $$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e006'$$,
-  '23514',
-  'A running timer cannot be reviewed.',
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e006'$$),
+  'tracker_review.timer_running',
   'a running timer cannot be approved'
+);
+
+select is(
+  pg_temp.review_hint($$update public.trackers set duration_minutes = 600 where id = '00000000-0000-0000-0000-00000000e001'$$),
+  'tracker_review.reviewed_locked',
+  'a manager cannot edit an approved entry in place'
+);
+
+select is(
+  pg_temp.review_hint($$update public.trackers set is_live = true, live_status = 'start', start_live_date = now() where id = '00000000-0000-0000-0000-00000000e001'$$),
+  'tracker_review.reviewed_locked',
+  'a manager cannot restart a timer on an approved entry'
+);
+
+select is(
+  pg_temp.review_hint($$update public.trackers set duration_minutes = 600 where id = '00000000-0000-0000-0000-00000000e007'$$),
+  'tracker_review.reviewed_locked',
+  'a manager cannot change their own admin-approved entry and keep the approval'
 );
 
 select lives_ok(
@@ -159,6 +201,12 @@ select is(
 
 -- admin
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a01","role":"authenticated","user_role":"admin"}', true);
+
+select is(
+  pg_temp.review_hint($$update public.trackers set duration_minutes = 30 where id = '00000000-0000-0000-0000-00000000e007'$$),
+  'tracker_review.reviewed_locked',
+  'an admin also undoes a review before editing the entry'
+);
 
 select lives_ok(
   $$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e004'$$,
