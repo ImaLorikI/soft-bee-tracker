@@ -6,7 +6,7 @@
   },
   "roleDescriptions": {
     "worker": "Logs time on assigned projects.",
-    "manager": "Can approve time and see reports.",
+    "manager": "Can approve time on projects they manage and see reports.",
     "admin": "Full access, including crew management."
   },
   "status": {
@@ -142,7 +142,7 @@
     "emailLabel": "Email",
     "emailPlaceholder": "teammate@softbee.dev",
     "roleLabel": "Role",
-    "roleDescription": "Managers can approve time and see reports.",
+    "roleDescription": "Managers can approve time on projects they manage and see reports.",
     "cancelButton": "Cancel",
     "sendButton": "Send invite",
     "networkError": "We couldn't reach the server. Check your connection and try again.",
