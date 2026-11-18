@@ -3,6 +3,8 @@ import type { UserRole } from '@/lib/api/auth';
 import { computeLeaveBalances, type LeaveBalance } from '@/lib/leave-days';
 import type { CrewLeaveRequest, CrewMember, CrewStatus, CrewViewer } from '@/lib/api/crew';
 import type { LeaveAllowance, LeaveType } from '@/lib/api/leave';
+import type { Tracker } from '@/lib/api/trackers';
+import { isLiveTrackerActive } from '@/lib/live-tracker';
 
 export function getCrewPermissions(role: UserRole): CrewPermissions {
   return CREW_PERMISSIONS[role];
@@ -80,6 +82,21 @@ export function canReviewLeaveRequest(request: Pick<CrewLeaveRequest, 'memberId'
   return request.status === 'pending' && (viewer.role === 'admin' || (viewer.role === 'manager' && request.memberId !== viewer.id));
 }
 
+// mirrors private.guard_tracker_review so the ui only offers what the database accepts.
+// which projects a manager may review is left to rls: they only receive those entries.
+// an unknown owner role fails closed for managers, like the trigger does
+export function canReviewTracker({ tracker, ownerRole, viewer }: CanReviewTrackerInput): boolean {
+  if (isLiveTrackerActive(tracker)) {
+    return false;
+  }
+
+  if (viewer.role === 'admin') {
+    return true;
+  }
+
+  return viewer.role === 'manager' && tracker.userId !== viewer.id && ownerRole !== null && ownerRole !== 'admin';
+}
+
 export function getMemberProfileHref(memberId: string): string {
   return `${ROUTES.PROFILE}/${encodeURIComponent(memberId)}`;
 }
@@ -116,6 +133,12 @@ const CREW_PERMISSIONS: Record<UserRole, CrewPermissions> = {
   manager: { canViewCrew: true, canInvite: false, canManageMembers: false, canReviewLeave: true },
   worker: { canViewCrew: false, canInvite: false, canManageMembers: false, canReviewLeave: false }
 };
+
+export interface CanReviewTrackerInput {
+  tracker: Pick<Tracker, 'userId' | 'isLive' | 'liveStatus'>;
+  ownerRole: UserRole | null;
+  viewer: CrewViewer;
+}
 
 export interface CrewPermissions {
   canViewCrew: boolean;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrewLeaveRequest, CrewMember } from '@/lib/api/crew';
 import {
+  canReviewTracker,
   computeMemberLeaveBalances,
   countPendingLeave,
   DEFAULT_CREW_FILTERS,
@@ -169,5 +170,53 @@ describe('computeMemberLeaveBalances', () => {
 
     expect(balances.vacation).toMatchObject({ allowanceDays: 25, usedDays: 2 });
     expect(balances.sick_leave).toMatchObject({ allowanceDays: 5, usedDays: 0, pendingDays: 1 });
+  });
+});
+
+describe('canReviewTracker', () => {
+  const entry = { userId: 'worker-1', isLive: false, liveStatus: null };
+  const manager = { id: 'manager-1', role: 'manager' as const };
+  const admin = { id: 'admin-1', role: 'admin' as const };
+
+  it('lets a manager review a staff entry', () => {
+    expect(canReviewTracker({ tracker: entry, ownerRole: 'worker', viewer: manager })).toBe(true);
+  });
+
+  it('lets a manager review another manager entry', () => {
+    expect(canReviewTracker({ tracker: { ...entry, userId: 'manager-2' }, ownerRole: 'manager', viewer: manager })).toBe(true);
+  });
+
+  it('never lets a manager review their own entry', () => {
+    expect(canReviewTracker({ tracker: { ...entry, userId: 'manager-1' }, ownerRole: 'manager', viewer: manager })).toBe(false);
+  });
+
+  it('never lets a manager review an admin entry', () => {
+    expect(canReviewTracker({ tracker: { ...entry, userId: 'admin-1' }, ownerRole: 'admin', viewer: manager })).toBe(false);
+  });
+
+  it('fails closed for a manager when the owner role is unknown', () => {
+    expect(canReviewTracker({ tracker: entry, ownerRole: null, viewer: manager })).toBe(false);
+  });
+
+  it('lets an admin review any entry, their own included', () => {
+    expect(canReviewTracker({ tracker: { ...entry, userId: 'admin-1' }, ownerRole: 'admin', viewer: admin })).toBe(true);
+    expect(canReviewTracker({ tracker: entry, ownerRole: null, viewer: admin })).toBe(true);
+  });
+
+  it('never lets staff review', () => {
+    expect(canReviewTracker({ tracker: entry, ownerRole: 'worker', viewer: { id: 'worker-2', role: 'worker' } })).toBe(false);
+  });
+
+  it('blocks a running or paused timer for everyone', () => {
+    expect(canReviewTracker({ tracker: { ...entry, isLive: true, liveStatus: 'start' }, ownerRole: 'worker', viewer: admin })).toBe(false);
+    expect(canReviewTracker({ tracker: { ...entry, isLive: true, liveStatus: 'pause' }, ownerRole: 'worker', viewer: manager })).toBe(
+      false
+    );
+  });
+
+  it('allows a finished live entry', () => {
+    expect(canReviewTracker({ tracker: { ...entry, isLive: true, liveStatus: 'finish' }, ownerRole: 'worker', viewer: manager })).toBe(
+      true
+    );
   });
 });
