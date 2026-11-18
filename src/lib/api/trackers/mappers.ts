@@ -1,4 +1,4 @@
-import type { CreateTrackerInput, StartLiveTrackerInput, Tracker } from '@/lib/api/trackers/types';
+import type { CreateTrackerInput, StartLiveTrackerInput, Tracker, TrackerReview } from '@/lib/api/trackers/types';
 import type { Database } from '@/types';
 import type { ApiError } from '@/types/api-error';
 import content from './content.json';
@@ -6,6 +6,7 @@ import content from './content.json';
 type TrackerRow = Database['public']['Tables']['trackers']['Row'];
 type InputTrackerRow = Database['public']['Tables']['trackers']['Insert'];
 export type UpdateTrackerRow = Database['public']['Tables']['trackers']['Update'];
+type TrackerReviewRow = Database['public']['Tables']['tracker_reviews']['Row'];
 
 export const TRACKER_COLUMNS =
   'id, created_at, updated_at, date, description, duration_minutes, is_live, live_duration_minutes, live_status, status, start_live_date, project_id, user_id, transaction_id, reviewed_by, reviewed_at, review_note';
@@ -29,6 +30,20 @@ export function mapTrackerRowToTracker(row: TrackerRow): Tracker {
     reviewedBy: row.reviewed_by,
     reviewedAt: row.reviewed_at,
     reviewNote: row.review_note
+  };
+}
+
+export const TRACKER_REVIEW_COLUMNS = 'id, created_at, tracker_id, action, actor_id, note, previous_status';
+
+export function mapTrackerReviewRowToTrackerReview(row: TrackerReviewRow): TrackerReview {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    trackerId: row.tracker_id,
+    action: row.action,
+    actorId: row.actor_id,
+    note: row.note,
+    previousStatus: row.previous_status
   };
 }
 
@@ -86,6 +101,7 @@ const REVIEW_ERROR_MESSAGES: Record<string, string> = {
   'tracker_review.entry_changed': content.reviewErrors.unexpected,
   'tracker_review.timer_running': content.reviewErrors.timerRunning,
   'tracker_review.reason_required': content.reviewErrors.reasonRequired,
+  'tracker_review.undo_reason_required': content.reviewErrors.undoReasonRequired,
   'tracker_review.reason_too_long': content.reviewErrors.reasonTooLong,
   'tracker_review.reviewed_locked': content.reviewErrors.reviewedLocked
 };

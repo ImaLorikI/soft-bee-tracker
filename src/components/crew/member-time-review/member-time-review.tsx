@@ -5,12 +5,12 @@ import { CheckIcon, Undo2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { ErrorState } from '@components/common/error-state/error-state';
-import { RejectTrackerDialog } from '@components/crew/reject-tracker-dialog/reject-tracker-dialog';
+import { ReviewNoteDialog, type ReviewNoteTarget } from '@components/crew/review-note-dialog/review-note-dialog';
 import { Badge } from '@ui/badge';
 import { Button } from '@ui/button';
 import { Skeleton } from '@ui/skeleton';
 import type { CrewMember, CrewViewer } from '@/lib/api/crew';
-import { useApproveTracker, useMemberTrackers, useUndoTrackerReview, type Tracker, type TrackerStatus } from '@/lib/api/trackers';
+import { useApproveTracker, useMemberTrackers, type Tracker, type TrackerStatus } from '@/lib/api/trackers';
 import { canReviewTracker, getFullName, getTrackerReviewRange } from '@/lib/crew';
 import { formatClock } from '@/lib/format-duration';
 import { formatText } from '@/lib/format-text';
@@ -23,9 +23,8 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
   const [range] = useState(() => getTrackerReviewRange(new Date()));
   const { data: trackers, isLoading, error, refetch } = useMemberTrackers({ userId: member.id, from: range.start, to: range.end });
   const approveTracker = useApproveTracker();
-  const undoReview = useUndoTrackerReview();
-  const [rejectingTracker, setRejectingTracker] = useState<Tracker | null>(null);
-  const isMutating = approveTracker.isPending || undoReview.isPending;
+  const [noteTarget, setNoteTarget] = useState<ReviewNoteTarget | null>(null);
+  const isMutating = approveTracker.isPending;
   const memberName = getFullName(member);
   const pendingCount = trackers?.filter((tracker) => tracker.status === 'new' && !isLiveTrackerActive(tracker)).length ?? 0;
 
@@ -42,15 +41,15 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
   }
 
   function handleReject(tracker: Tracker) {
-    setRejectingTracker(tracker);
+    setNoteTarget({ tracker, mode: 'reject' });
   }
 
   function handleUndo(tracker: Tracker) {
-    undoReview.mutate(tracker.id);
+    setNoteTarget({ tracker, mode: 'undo' });
   }
 
-  function handleRejectClose() {
-    setRejectingTracker(null);
+  function handleNoteClose() {
+    setNoteTarget(null);
   }
 
   return (
@@ -92,11 +91,11 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
         </ul>
       ) : null}
 
-      <RejectTrackerDialog
-        tracker={rejectingTracker}
-        entryLabel={rejectingTracker ? formatEntryLabel(rejectingTracker, getProjectName(rejectingTracker)) : ''}
+      <ReviewNoteDialog
+        target={noteTarget}
+        entryLabel={noteTarget ? formatEntryLabel(noteTarget.tracker, getProjectName(noteTarget.tracker)) : ''}
         memberName={memberName}
-        onClose={handleRejectClose}
+        onClose={handleNoteClose}
       />
     </section>
   );

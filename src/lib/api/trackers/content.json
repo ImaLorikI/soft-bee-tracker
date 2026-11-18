@@ -15,6 +15,7 @@
     "ownEntry": "You can't review your own time entries.",
     "adminEntry": "Only an admin can review this entry.",
     "reasonRequired": "Add a reason to reject this entry.",
+    "undoReasonRequired": "Add a reason to undo this review.",
     "reasonTooLong": "The reason can be at most 500 characters.",
     "timerRunning": "This timer is still running and can't be reviewed yet.",
     "alreadyReviewed": "This entry was already reviewed. Refresh to see the latest decision.",

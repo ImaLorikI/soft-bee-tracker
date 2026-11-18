@@ -18,9 +18,9 @@ import { trackerKeys } from '@/lib/api/trackers/queries';
 import type {
   CreateTrackerInput,
   FinishLiveTrackerInput,
-  RejectTrackerInput,
   StartLiveTrackerInput,
   Tracker,
+  TrackerReviewNoteInput,
   UpdateTrackerInput
 } from '@/lib/api/trackers/types';
 import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/live-tracker';
@@ -162,12 +162,13 @@ export function approveTracker(trackerId: string): Promise<Tracker> {
   return updateTrackerReview(trackerId, { status: 'approved' });
 }
 
-export function rejectTracker({ trackerId, note }: RejectTrackerInput): Promise<Tracker> {
+export function rejectTracker({ trackerId, note }: TrackerReviewNoteInput): Promise<Tracker> {
   return updateTrackerReview(trackerId, { status: 'rejected', review_note: note.trim() });
 }
 
-export function undoTrackerReview(trackerId: string): Promise<Tracker> {
-  return updateTrackerReview(trackerId, { status: 'new' });
+// the reason is not kept on the entry: the trigger moves it into tracker_reviews
+export function undoTrackerReview({ trackerId, note }: TrackerReviewNoteInput): Promise<Tracker> {
+  return updateTrackerReview(trackerId, { status: 'new', review_note: note.trim() });
 }
 
 async function updateTrackerReview(trackerId: string, changes: UpdateTrackerRow): Promise<Tracker> {
@@ -264,10 +265,11 @@ export function useRejectTracker(options?: UseTrackerMutationOptions) {
   });
 }
 
-export function useUndoTrackerReview() {
+export function useUndoTrackerReview(options?: UseTrackerMutationOptions) {
   return useTrackerMutation({
     mutationFn: undoTrackerReview,
     successMessage: content.reviewUndone,
+    options,
     extraInvalidateKeys: REVIEW_INVALIDATE_KEYS
   });
 }

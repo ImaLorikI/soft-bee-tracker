@@ -1,0 +1,122 @@
+'use client';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Undo2Icon, XIcon } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+
+import { Button } from '@ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@ui/dialog';
+import { Field, FieldError, FieldLabel } from '@ui/field';
+import { Textarea } from '@ui/textarea';
+import { useRejectTracker, useUndoTrackerReview, type Tracker } from '@/lib/api/trackers';
+import { formatText } from '@/lib/format-text';
+import { REVIEW_NOTE_FORM_DEFAULTS, reviewNoteFormSchema, type ReviewNoteFormValues } from '@/lib/schemas/review-note-form.schema';
+import content from '../content.json';
+
+// asks for the reason a review action needs: rejecting an entry or undoing a review.
+// open while `target` is set; the parent clears it to close
+export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: ReviewNoteDialogProps) {
+  const {
+    formState: { errors },
+    handleSubmit,
+    register,
+    reset
+  } = useForm<ReviewNoteFormValues>({
+    defaultValues: REVIEW_NOTE_FORM_DEFAULTS,
+    resolver: zodResolver(reviewNoteFormSchema)
+  });
+  const rejectTracker = useRejectTracker({ onSuccess: handleDone });
+  const undoReview = useUndoTrackerReview({ onSuccess: handleDone });
+  const mode: ReviewNoteMode = target?.mode ?? 'reject';
+  const copy = content.reviewNoteDialog[mode];
+  const isBusy = rejectTracker.isPending || undoReview.isPending;
+  const SubmitIcon = mode === 'reject' ? XIcon : Undo2Icon;
+
+  function handleDone() {
+    reset(REVIEW_NOTE_FORM_DEFAULTS);
+    onClose();
+  }
+
+  function handleNoteSubmit(values: ReviewNoteFormValues) {
+    if (!target) {
+      return;
+    }
+
+    const input = { trackerId: target.tracker.id, note: values.note };
+
+    if (target.mode === 'reject') {
+      rejectTracker.mutate(input);
+    } else {
+      undoReview.mutate(input);
+    }
+  }
+
+  function handleFormSubmit(event: React.FormEvent<HTMLFormElement>) {
+    void handleSubmit(handleNoteSubmit)(event);
+  }
+
+  function handleDialogOpenChange(nextOpen: boolean) {
+    if (nextOpen || isBusy) {
+      return;
+    }
+
+    reset(REVIEW_NOTE_FORM_DEFAULTS);
+    onClose();
+  }
+
+  function handleCancelClick() {
+    handleDialogOpenChange(false);
+  }
+
+  return (
+    <Dialog open={target !== null} onOpenChange={handleDialogOpenChange} disablePointerDismissal={isBusy}>
+      <DialogContent className='sm:max-w-md' showCloseButton={!isBusy}>
+        <DialogHeader>
+          <DialogTitle>{copy.title}</DialogTitle>
+          <DialogDescription>{formatText(copy.description, { entry: entryLabel, name: memberName })}</DialogDescription>
+        </DialogHeader>
+
+        <form className='grid gap-6' onSubmit={handleFormSubmit} noValidate>
+          <Field data-invalid={Boolean(errors.note)}>
+            <FieldLabel htmlFor='reviewNote'>{content.reviewNoteDialog.reasonLabel}</FieldLabel>
+            <Textarea
+              id='reviewNote'
+              rows={3}
+              maxLength={500}
+              autoFocus
+              placeholder={copy.placeholder}
+              disabled={isBusy}
+              aria-invalid={Boolean(errors.note)}
+              {...register('note')}
+            />
+            <FieldError errors={[errors.note]} />
+          </Field>
+
+          <DialogFooter>
+            <Button type='button' variant='outline' disabled={isBusy} onClick={handleCancelClick}>
+              {content.reviewNoteDialog.cancelButton}
+            </Button>
+            <Button type='submit' variant={mode === 'reject' ? 'destructive' : 'default'} disabled={isBusy}>
+              <SubmitIcon data-icon='inline-start' />
+              {isBusy ? copy.submittingButton : copy.submitButton}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export type ReviewNoteMode = 'reject' | 'undo';
+
+export interface ReviewNoteTarget {
+  tracker: Tracker;
+  mode: ReviewNoteMode;
+}
+
+interface ReviewNoteDialogProps {
+  target: ReviewNoteTarget | null;
+  entryLabel: string;
+  memberName: string;
+  onClose: () => void;
+}

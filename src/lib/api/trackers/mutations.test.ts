@@ -233,12 +233,12 @@ describe('tracker review mutations', () => {
     expect(builder.update).toHaveBeenCalledWith({ status: 'rejected', review_note: 'Wrong project' });
   });
 
-  it('undoes a review by moving the entry back to new', async () => {
+  it('undoes a review with a trimmed reason', async () => {
     const { builder } = mockTrackersTable();
 
-    await undoTrackerReview('tracker-1');
+    await undoTrackerReview({ trackerId: 'tracker-1', note: '  Approved the wrong day ' });
 
-    expect(builder.update).toHaveBeenCalledWith({ status: 'new' });
+    expect(builder.update).toHaveBeenCalledWith({ status: 'new', review_note: 'Approved the wrong day' });
   });
 
   it.each([
@@ -246,6 +246,7 @@ describe('tracker review mutations', () => {
     ['tracker_review.own_entry', 403, "You can't review your own time entries."],
     ['tracker_review.admin_entry', 403, 'Only an admin can review this entry.'],
     ['tracker_review.reason_required', 400, 'Add a reason to reject this entry.'],
+    ['tracker_review.undo_reason_required', 400, 'Add a reason to undo this review.'],
     ['tracker_review.reason_too_long', 400, 'The reason can be at most 500 characters.'],
     ['tracker_review.timer_running', 400, "This timer is still running and can't be reviewed yet."],
     ['tracker_review.invalid_transition', 400, 'This entry was already reviewed. Refresh to see the latest decision.'],

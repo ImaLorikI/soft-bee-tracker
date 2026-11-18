@@ -2,6 +2,8 @@ export type TrackerLiveStatus = 'finish' | 'pause' | 'start';
 
 export type TrackerStatus = 'approved' | 'new' | 'rejected';
 
+export type TrackerReviewAction = 'approved' | 'rejected' | 'undone';
+
 export interface Tracker {
   id: string;
   createdAt: string;
@@ -44,9 +46,20 @@ export interface UpdateTrackerInput {
   entry: CreateTrackerInput;
 }
 
-export interface RejectTrackerInput {
+// reject and undo both need a reason
+export interface TrackerReviewNoteInput {
   trackerId: string;
   note: string;
+}
+
+export interface TrackerReview {
+  id: string;
+  createdAt: string;
+  trackerId: string;
+  action: TrackerReviewAction;
+  actorId: string | null;
+  note: string | null;
+  previousStatus: TrackerStatus;
 }
 
 export interface MemberTrackersInput {

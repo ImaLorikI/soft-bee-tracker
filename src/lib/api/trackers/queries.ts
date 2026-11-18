@@ -2,8 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { mapTrackerRowToTracker, mapTrackersRowsToTrackers, TRACKER_COLUMNS } from '@/lib/api/trackers/mappers';
-import type { MemberTrackersInput, ProjectTrackersInput, Tracker } from '@/lib/api/trackers/types';
+import {
+  mapTrackerReviewRowToTrackerReview,
+  mapTrackerRowToTracker,
+  mapTrackersRowsToTrackers,
+  TRACKER_COLUMNS,
+  TRACKER_REVIEW_COLUMNS
+} from '@/lib/api/trackers/mappers';
+import type { MemberTrackersInput, ProjectTrackersInput, Tracker, TrackerReview } from '@/lib/api/trackers/types';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 
@@ -13,6 +19,7 @@ export const trackerKeys = {
   list: () => [...trackerKeys.lists()] as const,
   project: (input: ProjectTrackersInput) => [...trackerKeys.all, 'project', input] as const,
   member: (input: MemberTrackersInput) => [...trackerKeys.all, 'member', input] as const,
+  reviews: (trackerIds: string[]) => [...trackerKeys.all, 'reviews', trackerIds] as const,
   activeLive: () => [...trackerKeys.all, 'active-live'] as const
 };
 
@@ -120,6 +127,38 @@ export function useMemberTrackers(input: MemberTrackersInput) {
   return useQuery<Tracker[], ApiError>({
     queryKey: trackerKeys.member(input),
     queryFn: () => getMemberTrackers(input)
+  });
+}
+
+// review history of the given entries, newest first. rls returns rows only to managers and
+// admins, for entries they can see; staff get an empty list
+export async function getTrackerReviews(trackerIds: string[]): Promise<TrackerReview[]> {
+  if (trackerIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createBrowserClient();
+  const { data, error, status } = await supabase
+    .from('tracker_reviews')
+    .select(TRACKER_REVIEW_COLUMNS)
+    .in('tracker_id', trackerIds)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: status
+    } satisfies ApiError;
+  }
+
+  return data.map(mapTrackerReviewRowToTrackerReview);
+}
+
+export function useTrackerReviews(trackerIds: string[]) {
+  return useQuery<TrackerReview[], ApiError>({
+    queryKey: trackerKeys.reviews(trackerIds),
+    queryFn: () => getTrackerReviews(trackerIds),
+    enabled: trackerIds.length > 0
   });
 }
 

@@ -183,14 +183,23 @@
       "rejected": "Rejected"
     }
   },
-  "rejectTrackerDialog": {
-    "title": "Reject time entry",
-    "description": "{entry}. {name} will see the reason and can't edit the entry until the review is undone.",
+  "reviewNoteDialog": {
     "reasonLabel": "Reason",
-    "reasonPlaceholder": "For example: logged on the wrong project",
     "cancelButton": "Cancel",
-    "submitButton": "Reject entry",
-    "submittingButton": "Rejecting…"
+    "reject": {
+      "title": "Reject time entry",
+      "description": "{entry}. {name} will see the reason and can't edit the entry until the review is undone.",
+      "placeholder": "For example: logged on the wrong project",
+      "submitButton": "Reject entry",
+      "submittingButton": "Rejecting…"
+    },
+    "undo": {
+      "title": "Undo review",
+      "description": "{entry}. The entry goes back to New and {name} can edit it again. The reason stays in the review history.",
+      "placeholder": "For example: approved the wrong day",
+      "submitButton": "Undo review",
+      "submittingButton": "Undoing…"
+    }
   },
   "loadErrorTitle": "Couldn't load the crew",
   "loadError": "Something went wrong. Try again in a moment."
