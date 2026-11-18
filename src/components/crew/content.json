@@ -158,6 +158,31 @@
     "positionSaved": "Position updated for {name}",
     "dateSaved": "Employment date updated for {name}"
   },
+  "timeReview": {
+    "title": "Time to review",
+    "period": "Last month and this month",
+    "pendingCount": "{count} waiting",
+    "empty": "No time logged in this period.",
+    "onlyYourProjects": "You only see entries on projects you manage.",
+    "loadErrorTitle": "Couldn't load time entries",
+    "noDescription": "No description",
+    "running": "Timer running",
+    "approve": "Approve",
+    "reject": "Reject",
+    "undo": "Undo",
+    "approveLabel": "Approve {entry}",
+    "rejectLabel": "Reject {entry}",
+    "undoLabel": "Undo review of {entry}",
+    "reviewedBy": "{status} by {name} · {date}",
+    "unknownReviewer": "a former member",
+    "unknownProject": "Unknown project",
+    "reason": "Reason: {note}",
+    "status": {
+      "new": "New",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    }
+  },
   "rejectTrackerDialog": {
     "title": "Reject time entry",
     "description": "{entry}. {name} will see the reason and can't edit the entry until the review is undone.",

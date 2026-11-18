@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CrewLeaveRequest, CrewMember } from '@/lib/api/crew';
 import {
   canReviewTracker,
+  getTrackerReviewRange,
   computeMemberLeaveBalances,
   countPendingLeave,
   DEFAULT_CREW_FILTERS,
@@ -77,6 +78,12 @@ describe('getCrewPermissions', () => {
     expect(getCrewPermissions('admin')).toMatchObject({ canInvite: true, canManageMembers: true });
     expect(getCrewPermissions('manager')).toMatchObject({ canInvite: false, canManageMembers: false, canReviewLeave: true });
     expect(getCrewPermissions('worker').canViewCrew).toBe(false);
+  });
+
+  it('lets managers and admins review time, never staff', () => {
+    expect(getCrewPermissions('admin').canReviewTime).toBe(true);
+    expect(getCrewPermissions('manager').canReviewTime).toBe(true);
+    expect(getCrewPermissions('worker').canReviewTime).toBe(false);
   });
 });
 
@@ -218,5 +225,15 @@ describe('canReviewTracker', () => {
     expect(canReviewTracker({ tracker: { ...entry, isLive: true, liveStatus: 'finish' }, ownerRole: 'worker', viewer: manager })).toBe(
       true
     );
+  });
+});
+
+describe('getTrackerReviewRange', () => {
+  it('covers last month and this month', () => {
+    expect(getTrackerReviewRange(new Date(2026, 10, 18))).toEqual({ start: '2026-10-01', end: '2026-11-30' });
+  });
+
+  it('crosses the year boundary in january', () => {
+    expect(getTrackerReviewRange(new Date(2027, 0, 3))).toEqual({ start: '2026-12-01', end: '2027-01-31' });
   });
 });

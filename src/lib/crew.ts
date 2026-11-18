@@ -1,3 +1,5 @@
+import { subMonths } from 'date-fns';
+
 import { ROUTES } from '@/constants';
 import type { UserRole } from '@/lib/api/auth';
 import { computeLeaveBalances, type LeaveBalance } from '@/lib/leave-days';
@@ -5,6 +7,7 @@ import type { CrewLeaveRequest, CrewMember, CrewStatus, CrewViewer } from '@/lib
 import type { LeaveAllowance, LeaveType } from '@/lib/api/leave';
 import type { Tracker } from '@/lib/api/trackers';
 import { isLiveTrackerActive } from '@/lib/live-tracker';
+import { getPeriodRange, type DateKeyRange } from '@/lib/tracker-summary';
 
 export function getCrewPermissions(role: UserRole): CrewPermissions {
   return CREW_PERMISSIONS[role];
@@ -97,6 +100,12 @@ export function canReviewTracker({ tracker, ownerRole, viewer }: CanReviewTracke
   return viewer.role === 'manager' && tracker.userId !== viewer.id && ownerRole !== null && ownerRole !== 'admin';
 }
 
+// last month and this month: last month stays open to staff until the 5th, so both can still
+// hold entries waiting for review. managers may review older months too, but rarely need to
+export function getTrackerReviewRange(now: Date): DateKeyRange {
+  return { start: getPeriodRange(subMonths(now, 1), 'month').start, end: getPeriodRange(now, 'month').end };
+}
+
 export function getMemberProfileHref(memberId: string): string {
   return `${ROUTES.PROFILE}/${encodeURIComponent(memberId)}`;
 }
@@ -129,9 +138,9 @@ export const ALL_FILTER = 'all';
 export const DEFAULT_CREW_FILTERS: CrewFilters = { query: '', role: ALL_FILTER, position: ALL_FILTER, status: ALL_FILTER };
 
 const CREW_PERMISSIONS: Record<UserRole, CrewPermissions> = {
-  admin: { canViewCrew: true, canInvite: true, canManageMembers: true, canReviewLeave: true },
-  manager: { canViewCrew: true, canInvite: false, canManageMembers: false, canReviewLeave: true },
-  worker: { canViewCrew: false, canInvite: false, canManageMembers: false, canReviewLeave: false }
+  admin: { canViewCrew: true, canInvite: true, canManageMembers: true, canReviewLeave: true, canReviewTime: true },
+  manager: { canViewCrew: true, canInvite: false, canManageMembers: false, canReviewLeave: true, canReviewTime: true },
+  worker: { canViewCrew: false, canInvite: false, canManageMembers: false, canReviewLeave: false, canReviewTime: false }
 };
 
 export interface CanReviewTrackerInput {
@@ -145,6 +154,7 @@ export interface CrewPermissions {
   canInvite: boolean;
   canManageMembers: boolean;
   canReviewLeave: boolean;
+  canReviewTime: boolean;
 }
 
 export interface CrewFilters {
