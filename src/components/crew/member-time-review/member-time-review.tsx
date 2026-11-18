@@ -1,7 +1,7 @@
 'use client';
 
 import { format, parseISO } from 'date-fns';
-import { CheckIcon, Undo2Icon, XIcon } from 'lucide-react';
+import { CheckIcon, HistoryIcon, Undo2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { ErrorState } from '@components/common/error-state/error-state';
@@ -10,7 +10,14 @@ import { Badge } from '@ui/badge';
 import { Button } from '@ui/button';
 import { Skeleton } from '@ui/skeleton';
 import type { CrewMember, CrewViewer } from '@/lib/api/crew';
-import { useApproveTracker, useMemberTrackers, type Tracker, type TrackerStatus } from '@/lib/api/trackers';
+import {
+  useApproveTracker,
+  useMemberTrackers,
+  useTrackerReviews,
+  type Tracker,
+  type TrackerReview,
+  type TrackerStatus
+} from '@/lib/api/trackers';
 import { canReviewTracker, getFullName, getTrackerReviewRange } from '@/lib/crew';
 import { formatClock } from '@/lib/format-duration';
 import { formatText } from '@/lib/format-text';
@@ -22,6 +29,10 @@ import content from '../content.json';
 export function MemberTimeReview({ member, viewer, projectNames, memberNames }: MemberTimeReviewProps) {
   const [range] = useState(() => getTrackerReviewRange(new Date()));
   const { data: trackers, isLoading, error, refetch } = useMemberTrackers({ userId: member.id, from: range.start, to: range.end });
+  const trackerIds = trackers?.map((tracker) => tracker.id) ?? [];
+  // one request for the whole list; rls returns history only to managers and admins
+  const { data: reviews, error: reviewsError } = useTrackerReviews(trackerIds);
+  const reviewsByTracker = groupReviewsByTracker(reviews ?? []);
   const approveTracker = useApproveTracker();
   const [noteTarget, setNoteTarget] = useState<ReviewNoteTarget | null>(null);
   const isMutating = approveTracker.isPending;
@@ -73,6 +84,8 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
 
       {trackers && trackers.length === 0 ? <p className='text-muted-foreground text-sm'>{content.timeReview.empty}</p> : null}
 
+      {reviewsError ? <p className='text-destructive text-sm'>{content.timeReview.historyError}</p> : null}
+
       {trackers && trackers.length > 0 ? (
         <ul className='flex flex-col gap-2'>
           {trackers.map((tracker) => (
@@ -82,6 +95,8 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
               projectName={getProjectName(tracker)}
               reviewerName={tracker.reviewedBy ? (memberNames.get(tracker.reviewedBy) ?? content.timeReview.unknownReviewer) : null}
               canReview={canReviewTracker({ tracker, ownerRole: member.role, viewer })}
+              history={reviewsByTracker.get(tracker.id) ?? NO_REVIEWS}
+              memberNames={memberNames}
               isBusy={isMutating}
               onApprove={handleApprove}
               onReject={handleReject}
@@ -101,7 +116,18 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
   );
 }
 
-function TimeReviewRow({ tracker, projectName, reviewerName, canReview, isBusy, onApprove, onReject, onUndo }: TimeReviewRowProps) {
+function TimeReviewRow({
+  tracker,
+  projectName,
+  reviewerName,
+  canReview,
+  history,
+  memberNames,
+  isBusy,
+  onApprove,
+  onReject,
+  onUndo
+}: TimeReviewRowProps) {
   const isRunning = isLiveTrackerActive(tracker);
   const entryLabel = formatEntryLabel(tracker, projectName);
   const statusLabel = content.timeReview.status[tracker.status];
@@ -151,6 +177,8 @@ function TimeReviewRow({ tracker, projectName, reviewerName, canReview, isBusy, 
         <p className='text-sm break-words'>{formatText(content.timeReview.reason, { note: tracker.reviewNote })}</p>
       ) : null}
 
+      {history.length > 0 ? <ReviewHistory reviews={history} memberNames={memberNames} entryLabel={entryLabel} /> : null}
+
       {canReview ? (
         <div className='flex justify-end gap-2'>
           {tracker.status === 'new' ? (
@@ -193,6 +221,41 @@ function TimeReviewRow({ tracker, projectName, reviewerName, canReview, isBusy, 
   );
 }
 
+function ReviewHistory({ reviews, memberNames, entryLabel }: ReviewHistoryProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  function handleToggleClick() {
+    setIsOpen((open) => !open);
+  }
+
+  return (
+    <div className='flex flex-col gap-2'>
+      <Button variant='ghost' size='sm' className='w-fit' aria-expanded={isOpen} onClick={handleToggleClick}>
+        <HistoryIcon data-icon='inline-start' />
+        {isOpen ? content.timeReview.historyHide : formatText(content.timeReview.history, { count: reviews.length })}
+      </Button>
+      {isOpen ? (
+        <ol aria-label={formatText(content.timeReview.historyLabel, { entry: entryLabel })} className='flex flex-col gap-2 border-l pl-3'>
+          {reviews.map((review) => (
+            <li key={review.id} className='flex flex-col gap-0.5'>
+              <span className='text-muted-foreground text-xs'>
+                {formatText(content.timeReview.historyItem, {
+                  action: content.timeReview.historyActions[review.action],
+                  name: review.actorId
+                    ? (memberNames.get(review.actorId) ?? content.timeReview.unknownReviewer)
+                    : content.timeReview.unknownReviewer,
+                  date: format(parseISO(review.createdAt), 'd MMM, HH:mm')
+                })}
+              </span>
+              {review.note ? <span className='text-sm break-words'>{review.note}</span> : null}
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
 function TimeReviewSkeleton() {
   return (
     <div className='flex flex-col gap-2'>
@@ -203,9 +266,24 @@ function TimeReviewSkeleton() {
   );
 }
 
+// reviews arrive newest first and keep that order per entry
+function groupReviewsByTracker(reviews: TrackerReview[]): Map<string, TrackerReview[]> {
+  const reviewsByTracker = new Map<string, TrackerReview[]>();
+
+  for (const review of reviews) {
+    const trackerReviews = reviewsByTracker.get(review.trackerId) ?? [];
+    trackerReviews.push(review);
+    reviewsByTracker.set(review.trackerId, trackerReviews);
+  }
+
+  return reviewsByTracker;
+}
+
 function formatEntryLabel(tracker: Tracker, projectName: string): string {
   return `${projectName}, ${format(parseISO(tracker.date), 'd MMM')}, ${formatClock(tracker.durationMinutes)}`;
 }
+
+const NO_REVIEWS: TrackerReview[] = [];
 
 const STATUS_BADGE_VARIANTS: Record<TrackerStatus, 'info' | 'success' | 'destructive'> = {
   new: 'info',
@@ -225,8 +303,16 @@ interface TimeReviewRowProps {
   projectName: string;
   reviewerName: string | null;
   canReview: boolean;
+  history: TrackerReview[];
+  memberNames: Map<string, string>;
   isBusy: boolean;
   onApprove: (tracker: Tracker) => void;
   onReject: (tracker: Tracker) => void;
   onUndo: (tracker: Tracker) => void;
+}
+
+interface ReviewHistoryProps {
+  reviews: TrackerReview[];
+  memberNames: Map<string, string>;
+  entryLabel: string;
 }

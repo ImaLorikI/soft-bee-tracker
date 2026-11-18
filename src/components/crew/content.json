@@ -181,6 +181,16 @@
       "new": "New",
       "approved": "Approved",
       "rejected": "Rejected"
+    },
+    "history": "History ({count})",
+    "historyHide": "Hide history",
+    "historyLabel": "Review history for {entry}",
+    "historyItem": "{action} by {name} · {date}",
+    "historyError": "Couldn't load the review history.",
+    "historyActions": {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "undone": "Review undone"
     }
   },
   "reviewNoteDialog": {
