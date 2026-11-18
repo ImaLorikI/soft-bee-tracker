@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   approveTracker,
+  createTracker,
+  deleteTracker,
   discardLiveTracker,
   finishLiveTracker,
   pauseLiveTracker,
@@ -10,7 +12,8 @@ import {
   restartLiveTracker,
   resumeLiveTracker,
   startLiveTracker,
-  undoTrackerReview
+  undoTrackerReview,
+  updateTracker
 } from './mutations';
 import type { Tracker, TrackerStatus } from './types';
 
@@ -250,7 +253,11 @@ describe('tracker review mutations', () => {
     ['tracker_review.reason_too_long', 400, 'The reason can be at most 500 characters.'],
     ['tracker_review.timer_running', 400, "This timer is still running and can't be reviewed yet."],
     ['tracker_review.invalid_transition', 400, 'This entry was already reviewed. Refresh to see the latest decision.'],
-    ['tracker_review.reviewed_locked', 400, 'Undo the review before changing this entry.']
+    [
+      'tracker_review.reviewed_locked',
+      400,
+      'This entry was already reviewed. Ask a manager to undo the review before changing or deleting it.'
+    ]
   ])('maps the %s key to its message', async (hint, status, message) => {
     // the message text is deliberately unrelated: only the hint key may drive the mapping
     mockTrackersTable({
@@ -279,5 +286,53 @@ describe('tracker review mutations', () => {
     mockTrackersTable({ data: null, error: { code: 'XX000', message: 'internal detail' }, status: 500 });
 
     await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "Couldn't update the review. Try again.", statusCode: 500 });
+  });
+});
+
+describe('tracker write errors', () => {
+  const entry = { projectId: 'project-1', date: '2026-11-05', description: null, durationMinutes: 30 };
+  const lockedError = { code: '23514', message: 'Undo the review before changing this entry.', hint: 'tracker_review.reviewed_locked' };
+  const lockedMessage = 'This entry was already reviewed. Ask a manager to undo the review before changing or deleting it.';
+
+  beforeEach(() => {
+    createBrowserClient.mockReset();
+  });
+
+  it('explains a locked entry when editing it', async () => {
+    mockTrackersTable({ data: null, error: lockedError, status: 400 });
+
+    await expect(updateTracker({ trackerId: 'tracker-1', entry })).rejects.toEqual({ message: lockedMessage, statusCode: 400 });
+  });
+
+  it('explains a locked entry when deleting it', async () => {
+    mockTrackersTable({ data: null, error: lockedError, status: 400 });
+
+    await expect(deleteTracker({ ...runningTracker, status: 'approved' })).rejects.toEqual({ message: lockedMessage, statusCode: 400 });
+  });
+
+  it('explains an entry logged as already reviewed', async () => {
+    mockTrackersTable({
+      data: null,
+      error: { code: '23514', message: 'New time entries must start unreviewed.', hint: 'tracker_review.insert_reviewed' },
+      status: 400
+    });
+
+    await expect(createTracker(entry)).rejects.toEqual({
+      message: 'New time entries are saved unreviewed. Save it first, then approve it.',
+      statusCode: 400
+    });
+  });
+
+  it('keeps database messages that have no review key, such as a closed month', async () => {
+    mockTrackersTable({
+      data: null,
+      error: { code: '42501', message: 'Time for this month is closed and can no longer be changed.' },
+      status: 403
+    });
+
+    await expect(updateTracker({ trackerId: 'tracker-1', entry })).rejects.toEqual({
+      message: 'Time for this month is closed and can no longer be changed.',
+      statusCode: 403
+    });
   });
 });

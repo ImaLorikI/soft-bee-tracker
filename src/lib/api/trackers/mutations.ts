@@ -10,6 +10,7 @@ import {
   mapCreateTrackerInputToRow,
   mapStartLiveTrackerInputToRow,
   mapTrackerReviewErrorToApiError,
+  mapTrackerWriteErrorToApiError,
   mapTrackerRowToTracker,
   TRACKER_COLUMNS,
   type UpdateTrackerRow
@@ -48,10 +49,7 @@ export async function createTracker(input: CreateTrackerInput): Promise<Tracker>
     .single();
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return mapTrackerRowToTracker(data);
@@ -71,10 +69,7 @@ export async function startLiveTracker(input: StartLiveTrackerInput): Promise<Tr
     .single();
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return mapTrackerRowToTracker(data);
@@ -120,10 +115,7 @@ export async function discardLiveTracker(tracker: Tracker): Promise<Tracker> {
   const { error, status } = await supabase.from('trackers').delete().eq('id', tracker.id).in('live_status', ['start', 'pause']);
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return tracker;
@@ -147,10 +139,7 @@ export async function deleteTracker(tracker: Tracker): Promise<Tracker> {
   const { error, status } = await supabase.from('trackers').delete().eq('id', tracker.id);
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return tracker;
@@ -187,10 +176,7 @@ async function updateTrackerRow(trackerId: string, changes: UpdateTrackerRow): P
   const { data, error, status } = await supabase.from('trackers').update(changes).eq('id', trackerId).select(TRACKER_COLUMNS).single();
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return mapTrackerRowToTracker(data);
@@ -207,10 +193,7 @@ async function updateLiveTracker(trackerId: string, changes: UpdateTrackerRow): 
     .single();
 
   if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
+    throw mapTrackerWriteErrorToApiError(error, status);
   }
 
   return mapTrackerRowToTracker(data);

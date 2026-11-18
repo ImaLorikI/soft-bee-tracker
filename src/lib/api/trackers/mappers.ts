@@ -91,6 +91,16 @@ function getTrackerReviewErrorMessage(error: TrackerDatabaseError): string {
   return REVIEW_ERROR_MESSAGES[error.hint ?? ''] ?? content.reviewErrors.unexpected;
 }
 
+// any other tracker write (log, edit, timer, delete): a review key gets its message, so a
+// locked entry explains itself; other errors keep their database text, which is already
+// written for people (for example the closed-month message)
+export function mapTrackerWriteErrorToApiError(error: TrackerDatabaseError, statusCode: number): ApiError {
+  return {
+    message: (error.hint ? REVIEW_ERROR_MESSAGES[error.hint] : undefined) ?? error.message,
+    statusCode
+  };
+}
+
 const NO_ROWS_ERROR_CODE = 'PGRST116';
 
 const REVIEW_ERROR_MESSAGES: Record<string, string> = {
@@ -103,7 +113,8 @@ const REVIEW_ERROR_MESSAGES: Record<string, string> = {
   'tracker_review.reason_required': content.reviewErrors.reasonRequired,
   'tracker_review.undo_reason_required': content.reviewErrors.undoReasonRequired,
   'tracker_review.reason_too_long': content.reviewErrors.reasonTooLong,
-  'tracker_review.reviewed_locked': content.reviewErrors.reviewedLocked
+  'tracker_review.reviewed_locked': content.reviewErrors.reviewedLocked,
+  'tracker_review.insert_reviewed': content.reviewErrors.insertReviewed
 };
 
 export interface TrackerDatabaseError {

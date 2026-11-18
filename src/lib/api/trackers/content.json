@@ -19,7 +19,8 @@
     "reasonTooLong": "The reason can be at most 500 characters.",
     "timerRunning": "This timer is still running and can't be reviewed yet.",
     "alreadyReviewed": "This entry was already reviewed. Refresh to see the latest decision.",
-    "reviewedLocked": "Undo the review before changing this entry.",
-    "unexpected": "Couldn't update the review. Try again."
+    "reviewedLocked": "This entry was already reviewed. Ask a manager to undo the review before changing or deleting it.",
+    "unexpected": "Couldn't update the review. Try again.",
+    "insertReviewed": "New time entries are saved unreviewed. Save it first, then approve it."
   }
 }
