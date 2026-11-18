@@ -115,6 +115,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"tracker_reviews": {
+                  Row: {
+                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id": string | null,"created_at": string,"id": string,"note": string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id": string
+                  }
+                  Update: {
+                    "action"?: Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status"?: Database["public"]['Enums']["tracker_status"],"tracker_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tracker_reviews_actor_id_fkey"
+      columns: ["actor_id"]
+isOneToOne: false
+      referencedRelation: "users"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tracker_reviews_tracker_id_fkey"
+      columns: ["tracker_id"]
+isOneToOne: false
+      referencedRelation: "trackers"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"trackers": {
                   Row: {
                     "created_at": string,"date": string,"description": string | null,"duration_minutes": number,"id": string,"is_live": boolean,"live_duration_minutes": number,"live_status": Database["public"]['Enums']["tracker_live_status"] | null,"project_id": string,"review_note": string | null,"reviewed_at": string | null,"reviewed_by": string | null,"start_live_date": string | null,"status": Database["public"]['Enums']["tracker_status"],"transaction_id": string | null,"updated_at": string,"user_id": string
@@ -207,7 +233,7 @@ isOneToOne: true
                            }
           }
           Enums: {
-            "leave_status": "pending"|"approved"|"rejected"|"cancelled","leave_type": "vacation"|"sick_leave","project_status": "active"|"archived","project_type": "fixed_price"|"non_profit"|"time_material","tracker_live_status": "finish"|"pause"|"start","tracker_status": "approved"|"new"|"rejected","user_role": "worker"|"manager"|"admin"
+            "leave_status": "pending"|"approved"|"rejected"|"cancelled","leave_type": "vacation"|"sick_leave","project_status": "active"|"archived","project_type": "fixed_price"|"non_profit"|"time_material","tracker_live_status": "finish"|"pause"|"start","tracker_review_action": "approved"|"rejected"|"undone","tracker_status": "approved"|"new"|"rejected","user_role": "worker"|"manager"|"admin"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -327,7 +353,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "leave_status": ["pending", "approved", "rejected", "cancelled"],"leave_type": ["vacation", "sick_leave"],"project_status": ["active", "archived"],"project_type": ["fixed_price", "non_profit", "time_material"],"tracker_live_status": ["finish", "pause", "start"],"tracker_status": ["approved", "new", "rejected"],"user_role": ["worker", "manager", "admin"]
+            "leave_status": ["pending", "approved", "rejected", "cancelled"],"leave_type": ["vacation", "sick_leave"],"project_status": ["active", "archived"],"project_type": ["fixed_price", "non_profit", "time_material"],"tracker_live_status": ["finish", "pause", "start"],"tracker_review_action": ["approved", "rejected", "undone"],"tracker_status": ["approved", "new", "rejected"],"user_role": ["worker", "manager", "admin"]
           }
         }
 } as const

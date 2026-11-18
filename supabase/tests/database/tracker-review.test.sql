@@ -1,6 +1,6 @@
 begin;
 
-select plan(29);
+select plan(38);
 
 -- returns the hint of the error a statement raises (null when it succeeds). the app maps
 -- these stable keys, so tests assert them instead of message text. runs as the caller.
@@ -172,9 +172,46 @@ select is(
   'a manager cannot change their own admin-approved entry and keep the approval'
 );
 
+select is(
+  pg_temp.review_hint($$update public.trackers set status = 'new' where id = '00000000-0000-0000-0000-00000000e001'$$),
+  'tracker_review.undo_reason_required',
+  'undoing a review needs a reason'
+);
+
 select lives_ok(
-  $$update public.trackers set status = 'new' where id = '00000000-0000-0000-0000-00000000e001'$$,
-  'a manager can undo an approval'
+  $$update public.trackers set status = 'new', review_note = 'Approved the wrong day' where id = '00000000-0000-0000-0000-00000000e001'$$,
+  'a manager can undo an approval with a reason'
+);
+
+select is(
+  (select array_agg(row(action, actor_id, note, previous_status)::text order by created_at)
+   from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e001'),
+  array[
+    row('approved'::public.tracker_review_action, '00000000-0000-0000-0000-000000000a02'::uuid, null::text, 'new'::public.tracker_status)::text,
+    row('undone'::public.tracker_review_action, '00000000-0000-0000-0000-000000000a02'::uuid, 'Approved the wrong day', 'approved'::public.tracker_status)::text
+  ],
+  'history keeps the approval and the undo with its reason'
+);
+
+select is(
+  (select note from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e002' and action = 'rejected'),
+  'Wrong project',
+  'history keeps the rejection reason'
+);
+
+select throws_ok(
+  $$insert into public.tracker_reviews (tracker_id, action, actor_id, note, previous_status)
+    values ('00000000-0000-0000-0000-00000000e003', 'approved', '00000000-0000-0000-0000-000000000a02', null, 'new')$$,
+  '42501',
+  null,
+  'history cannot be written through the api'
+);
+
+select throws_ok(
+  $$select private.record_tracker_review('00000000-0000-0000-0000-00000000e003', 'approved', null, 'new')$$,
+  '42501',
+  null,
+  'the history writer refuses to run outside the review trigger'
 );
 
 select is(
@@ -192,6 +229,12 @@ select lives_ok(
 );
 
 update public.trackers set duration_minutes = 5 where id = '00000000-0000-0000-0000-00000000e002';
+
+select is(
+  (select count(*)::int from public.tracker_reviews),
+  0,
+  'staff cannot read review history'
+);
 
 select is(
   (select duration_minutes from public.trackers where id = '00000000-0000-0000-0000-00000000e002'),
@@ -219,7 +262,7 @@ select lives_ok(
 );
 
 select lives_ok(
-  $$update public.trackers set status = 'new' where id = '00000000-0000-0000-0000-00000000e002'$$,
+  $$update public.trackers set status = 'new', review_note = 'Project was right after all' where id = '00000000-0000-0000-0000-00000000e002'$$,
   'an admin can undo another reviewer''s rejection'
 );
 
@@ -227,6 +270,26 @@ select is(
   (select review_note from public.trackers where id = '00000000-0000-0000-0000-00000000e002'),
   null,
   'undoing a rejection clears its reason'
+);
+
+select is(
+  (select count(*)::int from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e002'),
+  2,
+  'an admin sees the whole history of an entry'
+);
+
+-- manager again: overriding an admin's decision is allowed, with a reason
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
+
+select lives_ok(
+  $$update public.trackers set status = 'rejected', review_note = 'Duplicate of another entry' where id = '00000000-0000-0000-0000-00000000e002'$$,
+  'a manager can reject again after the admin undo'
+);
+
+select is(
+  (select array_agg(action::text order by created_at) from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e002'),
+  array['rejected', 'undone', 'rejected'],
+  'a manager sees the history of entries on their project, in order'
 );
 
 select * from finish();
