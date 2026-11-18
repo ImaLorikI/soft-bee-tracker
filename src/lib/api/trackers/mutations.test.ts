@@ -62,7 +62,7 @@ const runningTracker: Tracker = {
 
 interface QueryResult {
   data: typeof trackerRow | null;
-  error: { message: string; code?: string } | null;
+  error: { message: string; code?: string; hint?: string } | null;
   status: number;
 }
 
@@ -213,7 +213,7 @@ describe('tracker review mutations', () => {
     createBrowserClient.mockReset();
   });
 
-  it('approves only an entry that is still new', async () => {
+  it('approves an entry and leaves status rules to the database', async () => {
     const { builder, from } = mockTrackersTable({ data: { ...trackerRow, status: 'approved' }, error: null, status: 200 });
 
     const tracker = await approveTracker('tracker-1');
@@ -221,77 +221,55 @@ describe('tracker review mutations', () => {
     expect(from).toHaveBeenCalledWith('trackers');
     expect(builder.update).toHaveBeenCalledWith({ status: 'approved' });
     expect(builder.eq).toHaveBeenCalledWith('id', 'tracker-1');
-    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
+    expect(builder.in).not.toHaveBeenCalled();
     expect(tracker.status).toBe('approved');
   });
 
-  it('rejects a new entry with a trimmed reason', async () => {
+  it('rejects an entry with a trimmed reason', async () => {
     const { builder } = mockTrackersTable();
 
     await rejectTracker({ trackerId: 'tracker-1', note: '  Wrong project  ' });
 
     expect(builder.update).toHaveBeenCalledWith({ status: 'rejected', review_note: 'Wrong project' });
-    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
   });
 
-  it('undoes only an entry that was reviewed', async () => {
+  it('undoes a review by moving the entry back to new', async () => {
     const { builder } = mockTrackersTable();
 
     await undoTrackerReview('tracker-1');
 
     expect(builder.update).toHaveBeenCalledWith({ status: 'new' });
-    expect(builder.in).toHaveBeenCalledWith('status', ['approved', 'rejected']);
   });
 
-  it('maps a worker review attempt to a not-allowed error', async () => {
+  it.each([
+    ['tracker_review.not_reviewer', 403, "You can't review this entry. It may be on a project you don't manage."],
+    ['tracker_review.own_entry', 403, "You can't review your own time entries."],
+    ['tracker_review.admin_entry', 403, 'Only an admin can review this entry.'],
+    ['tracker_review.reason_required', 400, 'Add a reason to reject this entry.'],
+    ['tracker_review.reason_too_long', 400, 'The reason can be at most 500 characters.'],
+    ['tracker_review.timer_running', 400, "This timer is still running and can't be reviewed yet."],
+    ['tracker_review.invalid_transition', 400, 'This entry was already reviewed. Refresh to see the latest decision.'],
+    ['tracker_review.reviewed_locked', 400, 'Undo the review before changing this entry.']
+  ])('maps the %s key to its message', async (hint, status, message) => {
+    // the message text is deliberately unrelated: only the hint key may drive the mapping
     mockTrackersTable({
       data: null,
-      error: { code: '42501', message: 'Only managers and admins can review time entries.' },
-      status: 403
+      error: { code: status === 403 ? '42501' : '23514', message: 'reworded in the database', hint },
+      status
     });
 
-    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "You can't review this entry.", statusCode: 403 });
+    await expect(approveTracker('tracker-1')).rejects.toEqual({ message, statusCode: status });
   });
 
-  it('maps a self review to its own message', async () => {
-    mockTrackersTable({ data: null, error: { code: '42501', message: 'You cannot review your own time entries.' }, status: 403 });
-
-    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "You can't review your own time entries.", statusCode: 403 });
-  });
-
-  it('maps a manager reviewing an admin entry to its own message', async () => {
-    mockTrackersTable({ data: null, error: { code: '42501', message: 'Only an admin can review this time entry.' }, status: 403 });
-
-    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: 'Only an admin can review this entry.', statusCode: 403 });
-  });
-
-  it('maps a missing reject reason', async () => {
-    mockTrackersTable({ data: null, error: { code: '23514', message: 'Add a reason to reject this time entry.' }, status: 400 });
-
-    await expect(rejectTracker({ trackerId: 'tracker-1', note: ' ' })).rejects.toEqual({
-      message: 'Add a reason to reject this entry.',
-      statusCode: 400
-    });
-  });
-
-  it('maps a running timer', async () => {
-    mockTrackersTable({ data: null, error: { code: '23514', message: 'A running timer cannot be reviewed.' }, status: 400 });
-
-    await expect(approveTracker('tracker-1')).rejects.toEqual({
-      message: "This timer is still running and can't be reviewed yet.",
-      statusCode: 400
-    });
-  });
-
-  it('maps a stale or hidden entry (no row matched) to a refresh hint', async () => {
+  it("reports no access when rls returns no row (another manager's project)", async () => {
     mockTrackersTable({
       data: null,
       error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' },
       status: 406
     });
 
-    await expect(undoTrackerReview('tracker-1')).rejects.toEqual({
-      message: 'This entry was already reviewed or changed. Refresh and try again.',
+    await expect(approveTracker('tracker-1')).rejects.toEqual({
+      message: "You can't review this entry. It may be on a project you don't manage.",
       statusCode: 406
     });
   });

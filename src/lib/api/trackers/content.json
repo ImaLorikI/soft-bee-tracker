@@ -11,12 +11,14 @@
   "entryRejected": "Entry rejected",
   "reviewUndone": "Review undone",
   "reviewErrors": {
-    "notAllowed": "You can't review this entry.",
+    "notAllowed": "You can't review this entry. It may be on a project you don't manage.",
     "ownEntry": "You can't review your own time entries.",
     "adminEntry": "Only an admin can review this entry.",
     "reasonRequired": "Add a reason to reject this entry.",
+    "reasonTooLong": "The reason can be at most 500 characters.",
     "timerRunning": "This timer is still running and can't be reviewed yet.",
-    "staleEntry": "This entry was already reviewed or changed. Refresh and try again.",
+    "alreadyReviewed": "This entry was already reviewed. Refresh to see the latest decision.",
+    "reviewedLocked": "Undo the review before changing this entry.",
     "unexpected": "Couldn't update the review. Try again."
   }
 }

@@ -21,7 +21,6 @@ import type {
   RejectTrackerInput,
   StartLiveTrackerInput,
   Tracker,
-  TrackerStatus,
   UpdateTrackerInput
 } from '@/lib/api/trackers/types';
 import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/live-tracker';
@@ -31,12 +30,6 @@ import content from './content.json';
 
 interface UseTrackerMutationOptions {
   onSuccess?: (tracker: Tracker) => void;
-}
-
-interface UpdateTrackerReviewInput {
-  trackerId: string;
-  changes: UpdateTrackerRow;
-  fromStatuses: TrackerStatus[];
 }
 
 export async function createTracker(input: CreateTrackerInput): Promise<Tracker> {
@@ -168,29 +161,23 @@ export async function deleteTracker(tracker: Tracker): Promise<Tracker> {
   return tracker;
 }
 
-// the status filters make a stale review (entry already reviewed or undone elsewhere) match
-// no row, so it fails instead of silently overwriting someone else's decision
+// no status filter: the review trigger rejects an invalid move (e.g. an entry another reviewer
+// already decided) with its own key, so "no row returned" only means the viewer has no access
 export function approveTracker(trackerId: string): Promise<Tracker> {
-  return updateTrackerReview({ trackerId, changes: { status: 'approved' }, fromStatuses: ['new'] });
+  return updateTrackerReview(trackerId, { status: 'approved' });
 }
 
 export function rejectTracker({ trackerId, note }: RejectTrackerInput): Promise<Tracker> {
-  return updateTrackerReview({ trackerId, changes: { status: 'rejected', review_note: note.trim() }, fromStatuses: ['new'] });
+  return updateTrackerReview(trackerId, { status: 'rejected', review_note: note.trim() });
 }
 
 export function undoTrackerReview(trackerId: string): Promise<Tracker> {
-  return updateTrackerReview({ trackerId, changes: { status: 'new' }, fromStatuses: ['approved', 'rejected'] });
+  return updateTrackerReview(trackerId, { status: 'new' });
 }
 
-async function updateTrackerReview({ trackerId, changes, fromStatuses }: UpdateTrackerReviewInput): Promise<Tracker> {
+async function updateTrackerReview(trackerId: string, changes: UpdateTrackerRow): Promise<Tracker> {
   const supabase = createBrowserClient();
-  const { data, error, status } = await supabase
-    .from('trackers')
-    .update(changes)
-    .eq('id', trackerId)
-    .in('status', fromStatuses)
-    .select(TRACKER_COLUMNS)
-    .single();
+  const { data, error, status } = await supabase.from('trackers').update(changes).eq('id', trackerId).select(TRACKER_COLUMNS).single();
 
   if (error) {
     throw mapTrackerReviewErrorToApiError(error, status);

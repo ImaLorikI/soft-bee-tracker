@@ -58,7 +58,8 @@ export function mapStartLiveTrackerInputToRow(input: StartLiveTrackerInput, star
   };
 }
 
-// codes and messages come from private.guard_tracker_review and the trackers rls policies
+// hint keys come from private.guard_tracker_review; matching keys (not message text) keeps the
+// mapping stable if the database wording changes
 export function mapTrackerReviewErrorToApiError(error: TrackerDatabaseError, statusCode: number): ApiError {
   return {
     message: getTrackerReviewErrorMessage(error),
@@ -67,29 +68,30 @@ export function mapTrackerReviewErrorToApiError(error: TrackerDatabaseError, sta
 }
 
 function getTrackerReviewErrorMessage(error: TrackerDatabaseError): string {
-  switch (error.code) {
-    case '42501':
-      if (error.message.includes('your own')) {
-        return content.reviewErrors.ownEntry;
-      }
-
-      return error.message.includes('Only an admin') ? content.reviewErrors.adminEntry : content.reviewErrors.notAllowed;
-    case '23514':
-      if (error.message.includes('reason')) {
-        return content.reviewErrors.reasonRequired;
-      }
-
-      return error.message.includes('running timer') ? content.reviewErrors.timerRunning : content.reviewErrors.staleEntry;
-    case NO_ROWS_ERROR_CODE:
-      return content.reviewErrors.staleEntry;
-    default:
-      return content.reviewErrors.unexpected;
+  // no row came back: rls hid the entry from this viewer (another manager's project) or it was deleted
+  if (error.code === NO_ROWS_ERROR_CODE) {
+    return content.reviewErrors.notAllowed;
   }
+
+  return REVIEW_ERROR_MESSAGES[error.hint ?? ''] ?? content.reviewErrors.unexpected;
 }
 
 const NO_ROWS_ERROR_CODE = 'PGRST116';
 
+const REVIEW_ERROR_MESSAGES: Record<string, string> = {
+  'tracker_review.not_reviewer': content.reviewErrors.notAllowed,
+  'tracker_review.own_entry': content.reviewErrors.ownEntry,
+  'tracker_review.admin_entry': content.reviewErrors.adminEntry,
+  'tracker_review.invalid_transition': content.reviewErrors.alreadyReviewed,
+  'tracker_review.entry_changed': content.reviewErrors.unexpected,
+  'tracker_review.timer_running': content.reviewErrors.timerRunning,
+  'tracker_review.reason_required': content.reviewErrors.reasonRequired,
+  'tracker_review.reason_too_long': content.reviewErrors.reasonTooLong,
+  'tracker_review.reviewed_locked': content.reviewErrors.reviewedLocked
+};
+
 export interface TrackerDatabaseError {
   code: string;
   message: string;
+  hint?: string | null;
 }
