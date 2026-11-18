@@ -5,9 +5,11 @@ import { toast } from 'sonner';
 
 import { format } from 'date-fns';
 
+import { crewKeys } from '@/lib/api/crew/queries';
 import {
   mapCreateTrackerInputToRow,
   mapStartLiveTrackerInputToRow,
+  mapTrackerReviewErrorToApiError,
   mapTrackerRowToTracker,
   TRACKER_COLUMNS,
   type UpdateTrackerRow
@@ -16,8 +18,10 @@ import { trackerKeys } from '@/lib/api/trackers/queries';
 import type {
   CreateTrackerInput,
   FinishLiveTrackerInput,
+  RejectTrackerInput,
   StartLiveTrackerInput,
   Tracker,
+  TrackerStatus,
   UpdateTrackerInput
 } from '@/lib/api/trackers/types';
 import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/live-tracker';
@@ -27,6 +31,12 @@ import content from './content.json';
 
 interface UseTrackerMutationOptions {
   onSuccess?: (tracker: Tracker) => void;
+}
+
+interface UpdateTrackerReviewInput {
+  trackerId: string;
+  changes: UpdateTrackerRow;
+  fromStatuses: TrackerStatus[];
 }
 
 export async function createTracker(input: CreateTrackerInput): Promise<Tracker> {
@@ -158,6 +168,37 @@ export async function deleteTracker(tracker: Tracker): Promise<Tracker> {
   return tracker;
 }
 
+// the status filters make a stale review (entry already reviewed or undone elsewhere) match
+// no row, so it fails instead of silently overwriting someone else's decision
+export function approveTracker(trackerId: string): Promise<Tracker> {
+  return updateTrackerReview({ trackerId, changes: { status: 'approved' }, fromStatuses: ['new'] });
+}
+
+export function rejectTracker({ trackerId, note }: RejectTrackerInput): Promise<Tracker> {
+  return updateTrackerReview({ trackerId, changes: { status: 'rejected', review_note: note.trim() }, fromStatuses: ['new'] });
+}
+
+export function undoTrackerReview(trackerId: string): Promise<Tracker> {
+  return updateTrackerReview({ trackerId, changes: { status: 'new' }, fromStatuses: ['approved', 'rejected'] });
+}
+
+async function updateTrackerReview({ trackerId, changes, fromStatuses }: UpdateTrackerReviewInput): Promise<Tracker> {
+  const supabase = createBrowserClient();
+  const { data, error, status } = await supabase
+    .from('trackers')
+    .update(changes)
+    .eq('id', trackerId)
+    .in('status', fromStatuses)
+    .select(TRACKER_COLUMNS)
+    .single();
+
+  if (error) {
+    throw mapTrackerReviewErrorToApiError(error, status);
+  }
+
+  return mapTrackerRowToTracker(data);
+}
+
 async function updateTrackerRow(trackerId: string, changes: UpdateTrackerRow): Promise<Tracker> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase.from('trackers').update(changes).eq('id', trackerId).select(TRACKER_COLUMNS).single();
@@ -222,6 +263,42 @@ export function useDeleteTracker(options?: UseTrackerMutationOptions) {
 
 export function useDiscardLiveTracker() {
   return useTrackerMutation(discardLiveTracker, content.timerDiscarded);
+}
+
+export function useApproveTracker() {
+  return useTrackerReviewMutation(approveTracker, content.entryApproved);
+}
+
+export function useRejectTracker(options?: UseTrackerMutationOptions) {
+  return useTrackerReviewMutation(rejectTracker, content.entryRejected, options);
+}
+
+export function useUndoTrackerReview() {
+  return useTrackerReviewMutation(undoTrackerReview, content.reviewUndone);
+}
+
+// reviews also change the crew snapshot, which holds tracker rows for team summaries
+function useTrackerReviewMutation<TInput>(
+  mutationFn: (input: TInput) => Promise<Tracker>,
+  successMessage: string,
+  options?: UseTrackerMutationOptions
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<Tracker, ApiError, TInput>({
+    mutationFn,
+    onSuccess: (tracker) => {
+      toast.success(successMessage);
+      options?.onSuccess?.(tracker);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: trackerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: crewKeys.all });
+    }
+  });
 }
 
 function useTrackerMutation<TInput>(

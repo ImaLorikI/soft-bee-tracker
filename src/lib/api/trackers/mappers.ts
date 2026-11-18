@@ -1,5 +1,7 @@
 import type { CreateTrackerInput, StartLiveTrackerInput, Tracker } from '@/lib/api/trackers/types';
 import type { Database } from '@/types';
+import type { ApiError } from '@/types/api-error';
+import content from './content.json';
 
 type TrackerRow = Database['public']['Tables']['trackers']['Row'];
 type InputTrackerRow = Database['public']['Tables']['trackers']['Insert'];
@@ -54,4 +56,40 @@ export function mapStartLiveTrackerInputToRow(input: StartLiveTrackerInput, star
     live_duration_minutes: 0,
     start_live_date: startedAt.toISOString()
   };
+}
+
+// codes and messages come from private.guard_tracker_review and the trackers rls policies
+export function mapTrackerReviewErrorToApiError(error: TrackerDatabaseError, statusCode: number): ApiError {
+  return {
+    message: getTrackerReviewErrorMessage(error),
+    statusCode
+  };
+}
+
+function getTrackerReviewErrorMessage(error: TrackerDatabaseError): string {
+  switch (error.code) {
+    case '42501':
+      if (error.message.includes('your own')) {
+        return content.reviewErrors.ownEntry;
+      }
+
+      return error.message.includes('Only an admin') ? content.reviewErrors.adminEntry : content.reviewErrors.notAllowed;
+    case '23514':
+      if (error.message.includes('reason')) {
+        return content.reviewErrors.reasonRequired;
+      }
+
+      return error.message.includes('running timer') ? content.reviewErrors.timerRunning : content.reviewErrors.staleEntry;
+    case NO_ROWS_ERROR_CODE:
+      return content.reviewErrors.staleEntry;
+    default:
+      return content.reviewErrors.unexpected;
+  }
+}
+
+const NO_ROWS_ERROR_CODE = 'PGRST116';
+
+export interface TrackerDatabaseError {
+  code: string;
+  message: string;
 }

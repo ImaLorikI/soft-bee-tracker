@@ -44,6 +44,17 @@ export interface UpdateTrackerInput {
   entry: CreateTrackerInput;
 }
 
+export interface RejectTrackerInput {
+  trackerId: string;
+  note: string;
+}
+
+export interface MemberTrackersInput {
+  userId: string;
+  from: string;
+  to: string;
+}
+
 export interface ProjectTrackersInput {
   projectId: string;
   from: string;

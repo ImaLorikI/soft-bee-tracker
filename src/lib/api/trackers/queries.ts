@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { mapTrackerRowToTracker, mapTrackersRowsToTrackers, TRACKER_COLUMNS } from '@/lib/api/trackers/mappers';
-import type { ProjectTrackersInput, Tracker } from '@/lib/api/trackers/types';
+import type { MemberTrackersInput, ProjectTrackersInput, Tracker } from '@/lib/api/trackers/types';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 
@@ -12,6 +12,7 @@ export const trackerKeys = {
   lists: () => [...trackerKeys.all, 'list'] as const,
   list: () => [...trackerKeys.lists()] as const,
   project: (input: ProjectTrackersInput) => [...trackerKeys.all, 'project', input] as const,
+  member: (input: MemberTrackersInput) => [...trackerKeys.all, 'member', input] as const,
   activeLive: () => [...trackerKeys.all, 'active-live'] as const
 };
 
@@ -120,5 +121,35 @@ export function useActiveLiveTracker() {
   return useQuery({
     queryKey: trackerKeys.activeLive(),
     queryFn: getActiveLiveTracker
+  });
+}
+
+// one person's entries for review, newest first. rls limits managers to the projects they
+// manage, so a manager may see only part of a member's time
+export async function getMemberTrackers({ userId, from, to }: MemberTrackersInput): Promise<Tracker[]> {
+  const supabase = createBrowserClient();
+  const { data, error, status } = await supabase
+    .from('trackers')
+    .select(TRACKER_COLUMNS)
+    .eq('user_id', userId)
+    .gte('date', from)
+    .lte('date', to)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: status
+    } satisfies ApiError;
+  }
+
+  return mapTrackersRowsToTrackers(data);
+}
+
+export function useMemberTrackers(input: MemberTrackersInput) {
+  return useQuery<Tracker[], ApiError>({
+    queryKey: trackerKeys.member(input),
+    queryFn: () => getMemberTrackers(input)
   });
 }

@@ -2,14 +2,17 @@ import { format } from 'date-fns';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  approveTracker,
   discardLiveTracker,
   finishLiveTracker,
   pauseLiveTracker,
+  rejectTracker,
   restartLiveTracker,
   resumeLiveTracker,
-  startLiveTracker
+  startLiveTracker,
+  undoTrackerReview
 } from './mutations';
-import type { Tracker } from './types';
+import type { Tracker, TrackerStatus } from './types';
 
 const createBrowserClient = vi.hoisted(() => vi.fn());
 
@@ -27,7 +30,7 @@ const trackerRow = {
   is_live: true,
   live_duration_minutes: 0,
   live_status: 'start' as const,
-  status: 'new' as const,
+  status: 'new' as TrackerStatus,
   start_live_date: '2026-11-05T11:00:00.000Z',
   project_id: 'project-1',
   user_id: 'user-1',
@@ -59,7 +62,7 @@ const runningTracker: Tracker = {
 
 interface QueryResult {
   data: typeof trackerRow | null;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
   status: number;
 }
 
@@ -202,5 +205,100 @@ describe('live tracker mutations', () => {
     mockTrackersTable({ data: null, error: { message: 'Permission denied' }, status: 403 });
 
     await expect(discardLiveTracker(runningTracker)).rejects.toEqual({ message: 'Permission denied', statusCode: 403 });
+  });
+});
+
+describe('tracker review mutations', () => {
+  beforeEach(() => {
+    createBrowserClient.mockReset();
+  });
+
+  it('approves only an entry that is still new', async () => {
+    const { builder, from } = mockTrackersTable({ data: { ...trackerRow, status: 'approved' }, error: null, status: 200 });
+
+    const tracker = await approveTracker('tracker-1');
+
+    expect(from).toHaveBeenCalledWith('trackers');
+    expect(builder.update).toHaveBeenCalledWith({ status: 'approved' });
+    expect(builder.eq).toHaveBeenCalledWith('id', 'tracker-1');
+    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
+    expect(tracker.status).toBe('approved');
+  });
+
+  it('rejects a new entry with a trimmed reason', async () => {
+    const { builder } = mockTrackersTable();
+
+    await rejectTracker({ trackerId: 'tracker-1', note: '  Wrong project  ' });
+
+    expect(builder.update).toHaveBeenCalledWith({ status: 'rejected', review_note: 'Wrong project' });
+    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
+  });
+
+  it('undoes only an entry that was reviewed', async () => {
+    const { builder } = mockTrackersTable();
+
+    await undoTrackerReview('tracker-1');
+
+    expect(builder.update).toHaveBeenCalledWith({ status: 'new' });
+    expect(builder.in).toHaveBeenCalledWith('status', ['approved', 'rejected']);
+  });
+
+  it('maps a worker review attempt to a not-allowed error', async () => {
+    mockTrackersTable({
+      data: null,
+      error: { code: '42501', message: 'Only managers and admins can review time entries.' },
+      status: 403
+    });
+
+    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "You can't review this entry.", statusCode: 403 });
+  });
+
+  it('maps a self review to its own message', async () => {
+    mockTrackersTable({ data: null, error: { code: '42501', message: 'You cannot review your own time entries.' }, status: 403 });
+
+    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "You can't review your own time entries.", statusCode: 403 });
+  });
+
+  it('maps a manager reviewing an admin entry to its own message', async () => {
+    mockTrackersTable({ data: null, error: { code: '42501', message: 'Only an admin can review this time entry.' }, status: 403 });
+
+    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: 'Only an admin can review this entry.', statusCode: 403 });
+  });
+
+  it('maps a missing reject reason', async () => {
+    mockTrackersTable({ data: null, error: { code: '23514', message: 'Add a reason to reject this time entry.' }, status: 400 });
+
+    await expect(rejectTracker({ trackerId: 'tracker-1', note: ' ' })).rejects.toEqual({
+      message: 'Add a reason to reject this entry.',
+      statusCode: 400
+    });
+  });
+
+  it('maps a running timer', async () => {
+    mockTrackersTable({ data: null, error: { code: '23514', message: 'A running timer cannot be reviewed.' }, status: 400 });
+
+    await expect(approveTracker('tracker-1')).rejects.toEqual({
+      message: "This timer is still running and can't be reviewed yet.",
+      statusCode: 400
+    });
+  });
+
+  it('maps a stale or hidden entry (no row matched) to a refresh hint', async () => {
+    mockTrackersTable({
+      data: null,
+      error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' },
+      status: 406
+    });
+
+    await expect(undoTrackerReview('tracker-1')).rejects.toEqual({
+      message: 'This entry was already reviewed or changed. Refresh and try again.',
+      statusCode: 406
+    });
+  });
+
+  it('does not leak raw database messages for unknown errors', async () => {
+    mockTrackersTable({ data: null, error: { code: 'XX000', message: 'internal detail' }, status: 500 });
+
+    await expect(approveTracker('tracker-1')).rejects.toEqual({ message: "Couldn't update the review. Try again.", statusCode: 500 });
   });
 });
