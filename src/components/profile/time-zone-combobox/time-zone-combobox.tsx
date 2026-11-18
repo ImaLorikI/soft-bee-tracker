@@ -5,8 +5,8 @@ import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Input } from '@ui/input';
-import { buildTimeZoneOptions, getRuntimeTimeZones, toTimeZoneOption, type TimeZoneOption } from '@/lib/time-zones';
-import { COMPANY_TIME_ZONE } from '@/lib/work-time-policy';
+import { buildTimeZoneOptions, getRuntimeTimeZones, toTimeZoneOption, type TimeZoneOption } from '@/lib/date/time-zones';
+import { COMPANY_TIME_ZONE } from '@/lib/tracker/work-time-policy';
 import content from '../content.json';
 
 export function TimeZoneCombobox({ id, value, detectedTimeZone, isDisabled, isInvalid, onChange }: TimeZoneComboboxProps) {

@@ -9,10 +9,10 @@ import { ReportResults } from '@components/reports/report-results/report-results
 import { ReportResultsSkeleton } from '@components/reports/reports-skeleton';
 import { ROUTES } from '@/constants';
 import type { UserRole } from '@/lib/api/auth';
-import { downloadFile } from '@/lib/download-file';
-import { COMPANY_TIME_ZONE, COMPANY_TIME_ZONE_LABEL } from '@/lib/work-time-policy';
-import { formatText } from '@/lib/format-text';
-import { buildReportCsv, buildReportFileName, buildReportPdf, type ReportExportFormat } from '@/lib/report-export';
+import { downloadFile } from '@/lib/format/download-file';
+import { COMPANY_TIME_ZONE, COMPANY_TIME_ZONE_LABEL } from '@/lib/tracker/work-time-policy';
+import { formatText } from '@/lib/format/format-text';
+import { buildReportCsv, buildReportFileName, buildReportPdf, type ReportExportFormat } from '@/lib/reports/report-export';
 import {
   buildReportSearch,
   describeSelection,
@@ -21,7 +21,7 @@ import {
   type Report,
   type ReportFilters as ReportFiltersValue,
   type ReportOptions
-} from '@/lib/reports';
+} from '@/lib/reports/reports';
 import content from '../content.json';
 
 export function ReportsWorkspace({ report, options, role, todayKey }: ReportsWorkspaceProps) {

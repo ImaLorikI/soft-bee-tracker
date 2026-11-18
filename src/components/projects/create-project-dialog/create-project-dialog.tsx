@@ -14,7 +14,7 @@ import { FieldGroup } from '@ui/field';
 import { Input } from '@ui/input';
 import { Textarea } from '@ui/textarea';
 import type { ProjectPerson } from '@/lib/api/users';
-import type { CreateProjectValues, ProjectSubmitOutcome } from '@/lib/projects';
+import type { CreateProjectValues, ProjectSubmitOutcome } from '@/lib/projects/projects';
 import { createProjectFormSchema, type CreateProjectFormValues } from '@/lib/schemas/project-form.schema';
 import schemaContent from '@/lib/schemas/content.json';
 import content from '../content.json';

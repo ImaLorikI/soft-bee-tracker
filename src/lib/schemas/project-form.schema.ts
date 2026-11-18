@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { containsSecret, hasSecretUrlParams, isWebUrl } from '@/lib/projects';
+import { containsSecret, hasSecretUrlParams, isWebUrl } from '@/lib/projects/projects';
 import content from './content.json';
 
 const projectLinkSchema = z.object({

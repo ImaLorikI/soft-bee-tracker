@@ -9,7 +9,7 @@ import { Skeleton } from '@ui/skeleton';
 import { useMyProjects } from '@/lib/api/projects';
 import type { MemberProject } from '@/lib/api/projects';
 import type { UserRole } from '@/lib/api/auth';
-import { canEditMemberProject } from '@/lib/profile';
+import { canEditMemberProject } from '@/lib/profile/profile';
 import { cn } from '@/lib/utils';
 import type { ApiError } from '@/types/api-error';
 import content from '../content.json';

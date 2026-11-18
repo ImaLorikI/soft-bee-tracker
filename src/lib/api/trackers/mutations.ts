@@ -20,7 +20,7 @@ import type {
   Tracker,
   UpdateTrackerInput
 } from '@/lib/api/trackers/types';
-import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/live-tracker';
+import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/tracker/live-tracker';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 import content from './content.json';

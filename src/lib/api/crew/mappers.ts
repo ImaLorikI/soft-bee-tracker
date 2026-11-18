@@ -10,8 +10,8 @@ import type {
   GrantLeaveInput
 } from '@/lib/api/crew/types';
 import type { Tracker } from '@/lib/api/trackers/types';
-import { getPeriodRange, isDateKeyInRange } from '@/lib/tracker-summary';
-import { getTrackerMinutes } from '@/lib/tracker-days';
+import { getPeriodRange, isDateKeyInRange } from '@/lib/tracker/tracker-summary';
+import { getTrackerMinutes } from '@/lib/tracker/tracker-days';
 import type { Database } from '@/types';
 
 type Tables = Database['public']['Tables'];

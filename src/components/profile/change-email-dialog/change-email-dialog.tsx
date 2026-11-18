@@ -13,7 +13,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { FieldGroup } from '@ui/field';
 import { Input } from '@ui/input';
 import { useRequestEmailChange } from '@/lib/api/auth';
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import { createEmailChangeFormSchema, type EmailChangeFormValues } from '@/lib/schemas/profile-form.schema';
 import type { ApiError } from '@/types/api-error';
 import content from '../content.json';

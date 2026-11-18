@@ -12,9 +12,9 @@ import { useNow } from '@/hooks/use-now';
 import { useProjects } from '@/lib/api/projects';
 import { useActiveLiveTracker, useDiscardLiveTracker, usePauseLiveTracker, useResumeLiveTracker } from '@/lib/api/trackers';
 import type { Tracker } from '@/lib/api/trackers';
-import { formatDuration } from '@/lib/format-duration';
-import { formatStopwatch, formatTimerLabel, getLiveElapsedSeconds } from '@/lib/live-tracker';
-import { formatText } from '@/lib/format-text';
+import { formatDuration } from '@/lib/format/format-duration';
+import { formatStopwatch, formatTimerLabel, getLiveElapsedSeconds } from '@/lib/tracker/live-tracker';
+import { formatText } from '@/lib/format/format-text';
 import content from '../content.json';
 
 export function LiveTrackerWidget() {

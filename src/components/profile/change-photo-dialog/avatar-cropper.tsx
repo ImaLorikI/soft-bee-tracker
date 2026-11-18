@@ -12,7 +12,7 @@ import {
   getCoverScale,
   type AvatarCrop,
   type ImageSize
-} from '@/lib/avatar-crop';
+} from '@/lib/avatar/avatar-crop';
 import content from '../content.json';
 
 export function AvatarCropper({ src, crop, disabled, onCropChange }: AvatarCropperProps) {

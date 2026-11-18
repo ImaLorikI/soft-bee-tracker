@@ -12,8 +12,8 @@ import { Button } from '@ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@ui/dialog';
 import { ROUTES } from '@/constants';
 import type { MemberProject, Project, ProjectType } from '@/lib/api/projects';
-import { formatText } from '@/lib/format-text';
-import { buildTeamReportHref } from '@/lib/team-report-params';
+import { formatText } from '@/lib/format/format-text';
+import { buildTeamReportHref } from '@/lib/reports/team-report-params';
 import content from '../content.json';
 
 export function ProjectDetailsDialog({ memberProject, canEdit }: ProjectDetailsDialogProps) {
