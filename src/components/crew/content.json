@@ -158,6 +158,15 @@
     "positionSaved": "Position updated for {name}",
     "dateSaved": "Employment date updated for {name}"
   },
+  "rejectTrackerDialog": {
+    "title": "Reject time entry",
+    "description": "{entry}. {name} will see the reason and can't edit the entry until the review is undone.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "For example: logged on the wrong project",
+    "cancelButton": "Cancel",
+    "submitButton": "Reject entry",
+    "submittingButton": "Rejecting…"
+  },
   "loadErrorTitle": "Couldn't load the crew",
   "loadError": "Something went wrong. Try again in a moment."
 }
