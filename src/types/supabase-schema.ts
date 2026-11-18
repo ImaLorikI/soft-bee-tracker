@@ -117,14 +117,14 @@ isOneToOne: false
                   ]
                 },"tracker_reviews": {
                   Row: {
-                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id": string | null,"created_at": string,"id": string,"note": string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id": string
+                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id": string | null,"created_at": string,"id": string,"note": string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id": string
+                    "action": Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status": Database["public"]['Enums']["tracker_status"],"tracker_id"?: string | null
                   }
                   Update: {
-                    "action"?: Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status"?: Database["public"]['Enums']["tracker_status"],"tracker_id"?: string
+                    "action"?: Database["public"]['Enums']["tracker_review_action"],"actor_id"?: string | null,"created_at"?: string,"id"?: string,"note"?: string | null,"previous_status"?: Database["public"]['Enums']["tracker_status"],"tracker_id"?: string | null
                   }
                   Relationships: [
                     {

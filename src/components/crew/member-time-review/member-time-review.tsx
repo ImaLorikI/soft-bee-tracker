@@ -271,6 +271,10 @@ function groupReviewsByTracker(reviews: TrackerReview[]): Map<string, TrackerRev
   const reviewsByTracker = new Map<string, TrackerReview[]>();
 
   for (const review of reviews) {
+    if (!review.trackerId) {
+      continue;
+    }
+
     const trackerReviews = reviewsByTracker.get(review.trackerId) ?? [];
     trackerReviews.push(review);
     reviewsByTracker.set(review.trackerId, trackerReviews);

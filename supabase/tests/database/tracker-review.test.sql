@@ -1,6 +1,6 @@
 begin;
 
-select plan(38);
+select plan(44);
 
 -- returns the hint of the error a statement raises (null when it succeeds). the app maps
 -- these stable keys, so tests assert them instead of message text. runs as the caller.
@@ -173,6 +173,12 @@ select is(
 );
 
 select is(
+  pg_temp.review_hint($$delete from public.trackers where id = '00000000-0000-0000-0000-00000000e007'$$),
+  'tracker_review.reviewed_locked',
+  'a manager cannot delete their own admin-approved entry and log it again'
+);
+
+select is(
   pg_temp.review_hint($$update public.trackers set status = 'new' where id = '00000000-0000-0000-0000-00000000e001'$$),
   'tracker_review.undo_reason_required',
   'undoing a review needs a reason'
@@ -208,10 +214,10 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$select private.record_tracker_review('00000000-0000-0000-0000-00000000e003', 'approved', null, 'new')$$,
+  $$select private.log_tracker_review()$$,
   '42501',
   null,
-  'the history writer refuses to run outside the review trigger'
+  'the history writer cannot be called directly'
 );
 
 select is(
@@ -226,6 +232,11 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select lives_ok(
   $$update public.trackers set duration_minutes = 90 where id = '00000000-0000-0000-0000-00000000e001'$$,
   'a worker can edit an entry after its review was undone'
+);
+
+select lives_ok(
+  $$delete from public.trackers where id = '00000000-0000-0000-0000-00000000e001'$$,
+  'a worker can delete an entry that is new again'
 );
 
 update public.trackers set duration_minutes = 5 where id = '00000000-0000-0000-0000-00000000e002';
@@ -256,6 +267,12 @@ select lives_ok(
   'an admin can approve a manager entry'
 );
 
+select is(
+  pg_temp.review_hint($$delete from public.trackers where id = '00000000-0000-0000-0000-00000000e004'$$),
+  'tracker_review.reviewed_locked',
+  'an admin also undoes a review before deleting the entry'
+);
+
 select lives_ok(
   $$update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e005'$$,
   'an admin can approve their own entry'
@@ -268,14 +285,20 @@ select lives_ok(
 
 select is(
   (select review_note from public.trackers where id = '00000000-0000-0000-0000-00000000e002'),
-  null,
-  'undoing a rejection clears its reason'
+  'Project was right after all',
+  'undo replaces the rejection reason with the undo reason (read by the history trigger)'
 );
 
 select is(
   (select count(*)::int from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e002'),
   2,
   'an admin sees the whole history of an entry'
+);
+
+select is(
+  (select array_agg(action::text order by created_at) from public.tracker_reviews where tracker_id is null),
+  array['approved', 'undone'],
+  'history of a deleted entry survives and admins still see it'
 );
 
 -- manager again: overriding an admin's decision is allowed, with a reason
@@ -290,6 +313,38 @@ select is(
   (select array_agg(action::text order by created_at) from public.tracker_reviews where tracker_id = '00000000-0000-0000-0000-00000000e002'),
   array['rejected', 'undone', 'rejected'],
   'a manager sees the history of entries on their project, in order'
+);
+
+select is(
+  (select count(*)::int from public.tracker_reviews where tracker_id is null),
+  0,
+  'managers do not see history of deleted entries'
+);
+
+-- deleting a reviewer's profile clears reviewed_by (fk on delete set null) even from a
+-- session with a user, instead of the trigger putting the deleted id back
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token,
+  email_change_token_new, email_change)
+values ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000a99', 'authenticated',
+  'authenticated', 'former-reviewer@softbee.test', '', now(), '{"provider": "email", "providers": ["email"]}',
+  '{"username": "former-reviewer", "first_name": "Former", "last_name": "Reviewer"}', now(), now(), '', '', '', '');
+
+insert into public.trackers (id, date, duration_minutes, status, reviewed_by, reviewed_at, project_id, user_id)
+values ('00000000-0000-0000-0000-00000000e008', current_date, 30, 'approved', '00000000-0000-0000-0000-000000000a99', now(),
+  '00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a01","role":"authenticated","user_role":"admin"}', true);
+
+delete from public.users where id = '00000000-0000-0000-0000-000000000a99';
+
+select is(
+  (select row(status, reviewed_by)::text from public.trackers where id = '00000000-0000-0000-0000-00000000e008'),
+  row('approved'::public.tracker_status, null::uuid)::text,
+  'a deleted reviewer leaves no dangling reviewed_by'
 );
 
 select * from finish();

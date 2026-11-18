@@ -4,17 +4,19 @@
 --   reason, so overriding someone else's decision (for example a manager undoing an admin's
 --   rejection) leaves an explanation behind.
 -- affected objects: type public.tracker_review_action; table public.tracker_reviews with
---   indexes, checks and rls policies; function private.record_tracker_review(uuid,
---   public.tracker_review_action, text, public.tracker_status); function
---   private.guard_tracker_review() (replaced, adds history and the undo reason)
+--   indexes, checks and rls policies; functions private.guard_tracker_review() (replaced:
+--   undo reason) and private.log_tracker_review(); trigger log_tracker_review on public.trackers
 -- special risks:
 --   - undo without a reason now fails (hint tracker_review.undo_reason_required); the app
---     sends one from this release on.
+--     sends one from this release on. the undo reason stays in trackers.review_note until
+--     the next review, which is where the history trigger reads it from.
 --   - only managers and admins can read the history; staff see the current status and
 --     rejection reason on the entry itself.
---   - rows are written only by the review trigger. reviews made by trusted sessions (service
---     role, sql, seeds) are not recorded. history rows go away with their entry (cascade).
---   - no changes to existing tables or data.
+--   - rows are written only by the log trigger. reviews made by trusted sessions (service
+--     role, sql, seeds) are not recorded.
+--   - history outlives its entry: deleting an entry (possible only while it is new) keeps its
+--     rows with tracker_id set to null, readable by admins only.
+--   - no changes to existing data.
 
 create type public.tracker_review_action as enum ('approved', 'rejected', 'undone');
 
@@ -22,7 +24,8 @@ create table public.tracker_reviews (
   id uuid primary key default gen_random_uuid(),
   -- clock_timestamp, not now(): several decisions in one transaction still keep their order
   created_at timestamptz not null default pg_catalog.clock_timestamp(),
-  tracker_id uuid not null references public.trackers (id) on delete cascade,
+  -- set null, not cascade: deleting an entry must not erase the decisions made about it
+  tracker_id uuid references public.trackers (id) on delete set null,
   action public.tracker_review_action not null,
   -- null once the reviewer's profile is deleted; the history row itself stays
   actor_id uuid references public.users (id) on delete set null,
@@ -47,61 +50,33 @@ create policy "require secure session"
   using ((select private.is_secure()))
   with check ((select private.is_secure()));
 
--- managers and admins, for entries they can see: the trackers select policy inside the
--- exists limits managers to their projects. staff have no access to the history.
+-- admins read everything, including history of deleted entries. managers read history of
+-- entries they can see: the trackers select policy inside the exists limits them to their
+-- projects. staff have no access to the history.
 create policy "tracker_reviews_select_management"
   on public.tracker_reviews
   for select
   to authenticated
   using (
-    (select private.is_manager_or_admin())
-    and exists (
-      select 1
-      from public.trackers t
-      where t.id = tracker_id
+    (select private.is_admin())
+    or (
+      (select private.is_manager_or_admin())
+      and exists (
+        select 1
+        from public.trackers t
+        where t.id = tracker_reviews.tracker_id
+      )
     )
   );
 
--- no insert, update or delete policies: rows come only from private.record_tracker_review
+-- no insert, update or delete policies: rows come only from private.log_tracker_review
 -- safety: fresh stacks grant api roles everything by default, including truncate
 revoke all on table public.tracker_reviews from anon, authenticated;
 grant select on table public.tracker_reviews to authenticated;
 grant all on table public.tracker_reviews to service_role;
 
--- security definer justification: the review trigger runs as the caller, who has no insert
--- right on public.tracker_reviews (the log must not be writable through the api). this
--- function is the only writer. it refuses to run outside a trigger, the private schema is
--- not exposed through postgrest, and the actor is always auth.uid(), never a parameter.
-create or replace function private.record_tracker_review(
-  target_tracker_id uuid,
-  review_action public.tracker_review_action,
-  review_note text,
-  from_status public.tracker_status
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if pg_catalog.pg_trigger_depth() < 1 then
-    raise exception 'Tracker reviews are recorded only by the review trigger.'
-      using errcode = 'insufficient_privilege';
-  end if;
-
-  insert into public.tracker_reviews (tracker_id, action, actor_id, note, previous_status)
-  values (target_tracker_id, review_action, (select auth.uid()), review_note, from_status);
-end;
-$$;
-
-comment on function private.record_tracker_review(uuid, public.tracker_review_action, text, public.tracker_status) is
-  'writes one tracker_reviews row for the current user; callable only from the review trigger';
-
-revoke execute on function private.record_tracker_review(uuid, public.tracker_review_action, text, public.tracker_status) from public, anon;
-grant execute on function private.record_tracker_review(uuid, public.tracker_review_action, text, public.tracker_status) to authenticated;
-
--- same rules as 20261118104238_tracker_review.sql, plus: undo needs a reason, and every
--- status change is recorded in public.tracker_reviews
+-- same rules as 20261118104238_tracker_review.sql, plus: undo needs a reason, which stays
+-- on the row for private.log_tracker_review to record
 create or replace function private.guard_tracker_review()
 returns trigger
 language plpgsql
@@ -117,7 +92,16 @@ declare
 begin
   -- service role and sql sessions have no user; they are trusted (seeds, maintenance)
   if caller_id is null then
-    return new;
+    return coalesce(new, old);
+  end if;
+
+  if tg_op = 'DELETE' then
+    if old.status <> 'new' then
+      raise exception 'Undo the review before deleting this entry.'
+        using errcode = 'check_violation', hint = 'tracker_review.reviewed_locked';
+    end if;
+
+    return old;
   end if;
 
   if tg_op = 'INSERT' then
@@ -147,9 +131,20 @@ begin
         using errcode = 'check_violation', hint = 'tracker_review.reviewed_locked';
     end if;
 
-    new.reviewed_by := old.reviewed_by;
     new.reviewed_at := old.reviewed_at;
     new.review_note := old.review_note;
+
+    -- the reviewed_by fk (on delete set null) clears it when the reviewer's profile is deleted;
+    -- let only that through, so the row never points at a missing user and clients still
+    -- cannot rewrite who reviewed the entry
+    if not (
+      new.reviewed_by is null
+      and old.reviewed_by is not null
+      and not exists (select 1 from public.users u where u.id = old.reviewed_by)
+    ) then
+      new.reviewed_by := old.reviewed_by;
+    end if;
+
     return new;
   end if;
 
@@ -211,22 +206,16 @@ begin
       using errcode = 'check_violation', hint = 'tracker_review.reason_too_long';
   end if;
 
-  perform private.record_tracker_review(
-    old.id,
-    case new.status when 'new' then 'undone' else new.status::text end::public.tracker_review_action,
-    note,
-    old.status
-  );
+  -- the reason of a reject or an undo stays on the row; log_tracker_review records it
+  new.review_note := note;
 
-  -- undo: the entry is unreviewed again and its owner may edit it; the reason lives in history
+  -- undo: the entry is unreviewed again and its owner may edit it
   if new.status = 'new' then
     new.reviewed_by := null;
     new.reviewed_at := null;
-    new.review_note := null;
     return new;
   end if;
 
-  new.review_note := note;
   new.reviewed_by := caller_id;
   new.reviewed_at := pg_catalog.now();
   return new;
@@ -234,4 +223,46 @@ end;
 $$;
 
 comment on function private.guard_tracker_review() is
-  'before write trigger: enforces who may approve/reject/undo tracker entries, locks reviewed entries, stamps review data and records history';
+  'before write trigger: enforces who may approve/reject/undo tracker entries, locks reviewed entries against edits and deletes, and stamps review data';
+
+comment on column public.trackers.review_note is
+  'reason of the latest reject or undo (shown to staff only while rejected); the full log is public.tracker_reviews';
+
+-- security definer justification: callers have no insert right on public.tracker_reviews,
+-- so the log cannot be written through the api. a trigger function cannot be called
+-- directly (or from another function), so this cannot be used to forge history; it only
+-- runs after a status change the guard trigger already accepted, and the actor is always
+-- auth.uid().
+create or replace function private.log_tracker_review()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- trusted sessions (service role, sql, seeds) are not recorded
+  if (select auth.uid()) is null or new.status = old.status then
+    return null;
+  end if;
+
+  insert into public.tracker_reviews (tracker_id, action, actor_id, note, previous_status)
+  values (
+    new.id,
+    case new.status when 'new' then 'undone' else new.status::text end::public.tracker_review_action,
+    (select auth.uid()),
+    new.review_note,
+    old.status
+  );
+
+  return null;
+end;
+$$;
+
+comment on function private.log_tracker_review() is
+  'after update trigger: appends one tracker_reviews row per status change made by a user';
+
+revoke execute on function private.log_tracker_review() from public, anon, authenticated;
+
+create trigger log_tracker_review
+  after update of status on public.trackers
+  for each row execute function private.log_tracker_review();

@@ -13,9 +13,9 @@
 --   - only managers and admins change status. managers never review their own entries or
 --     an admin's entries; admins review any entry, their own included. which projects a
 --     manager may touch is still decided by the trackers update rls policy.
---   - a reviewed (approved or rejected) entry cannot be edited at all, by anyone, until the
---     review is undone. otherwise a manager could change their own admin-approved entry
---     and keep the approval.
+--   - a reviewed (approved or rejected) entry cannot be edited or deleted, by anyone, until
+--     the review is undone. otherwise a manager could change, or delete and re-log, their own
+--     admin-approved entry.
 --   - a status change cannot carry other edits, and a running or paused timer cannot be
 --     approved or rejected.
 --   - rejecting needs a reason of at most 500 characters. reviewed_by / reviewed_at always
@@ -27,8 +27,8 @@
 --     existing row has a review_note); existing rows keep their status and get null review
 --     data. no policy or grant changes on public.trackers.
 --   - authenticated inserts with a status other than 'new' now fail (no app path does this).
---   - managers and admins can no longer correct an approved or rejected entry in place;
---     they undo the review first.
+--   - managers and admins can no longer correct or delete an approved or rejected entry in
+--     place; they undo the review first. this also applies to staff deleting their entries.
 --   - only the latest review is stored on the row.
 
 -- safety: additive only. new nullable columns, no defaults to backfill, no rewrite of
@@ -87,7 +87,16 @@ declare
 begin
   -- service role and sql sessions have no user; they are trusted (seeds, maintenance)
   if caller_id is null then
-    return new;
+    return coalesce(new, old);
+  end if;
+
+  if tg_op = 'DELETE' then
+    if old.status <> 'new' then
+      raise exception 'Undo the review before deleting this entry.'
+        using errcode = 'check_violation', hint = 'tracker_review.reviewed_locked';
+    end if;
+
+    return old;
   end if;
 
   if tg_op = 'INSERT' then
@@ -117,9 +126,20 @@ begin
         using errcode = 'check_violation', hint = 'tracker_review.reviewed_locked';
     end if;
 
-    new.reviewed_by := old.reviewed_by;
     new.reviewed_at := old.reviewed_at;
     new.review_note := old.review_note;
+
+    -- the reviewed_by fk (on delete set null) clears it when the reviewer's profile is deleted;
+    -- let only that through, so the row never points at a missing user and clients still
+    -- cannot rewrite who reviewed the entry
+    if not (
+      new.reviewed_by is null
+      and old.reviewed_by is not null
+      and not exists (select 1 from public.users u where u.id = old.reviewed_by)
+    ) then
+      new.reviewed_by := old.reviewed_by;
+    end if;
+
     return new;
   end if;
 
@@ -193,10 +213,10 @@ end;
 $$;
 
 comment on function private.guard_tracker_review() is
-  'before write trigger: enforces who may approve/reject tracker entries, allowed status moves, locks reviewed entries, and stamps review data';
+  'before write trigger: enforces who may approve/reject tracker entries, allowed status moves, locks reviewed entries against edits and deletes, and stamps review data';
 
 revoke execute on function private.guard_tracker_review() from public, anon, authenticated;
 
 create trigger guard_tracker_review
-  before insert or update on public.trackers
+  before insert or update or delete on public.trackers
   for each row execute function private.guard_tracker_review();

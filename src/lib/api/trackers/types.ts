@@ -55,7 +55,8 @@ export interface TrackerReviewNoteInput {
 export interface TrackerReview {
   id: string;
   createdAt: string;
-  trackerId: string;
+  // null once the entry itself was deleted; the history is kept
+  trackerId: string | null;
   action: TrackerReviewAction;
   actorId: string | null;
   note: string | null;
