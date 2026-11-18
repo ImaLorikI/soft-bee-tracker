@@ -1,0 +1,157 @@
+-- migration: tracker review (approve / reject time entries)
+-- purpose: let managers and admins approve or reject staff time entries, record who
+--   reviewed an entry and when, and make the database (not only the ui) enforce the
+--   review rules. until now the trackers update policy let a project manager set any
+--   status on any row, including their own, with any other change in the same write.
+-- affected objects: columns public.trackers.reviewed_by, reviewed_at, review_note;
+--   index trackers_reviewed_by_idx; check trackers_review_note_length_check;
+--   function private.guard_tracker_review(); trigger guard_tracker_review on public.trackers
+-- rules (enforced for every request with a user; service role and sql sessions are trusted):
+--   - new entries always start as 'new' with no review data.
+--   - status moves only new -> approved | rejected, or back approved | rejected -> new (undo).
+--   - only managers and admins change status. managers never review their own entries or
+--     an admin's entries; admins review any entry, their own included. which projects a
+--     manager may touch is still decided by the trackers update rls policy.
+--   - a status change cannot carry other edits, and a running or paused timer cannot be
+--     approved or rejected.
+--   - rejecting needs a reason. reviewed_by / reviewed_at always come from the trigger
+--     (caller and now()), so clients cannot forge them; undo clears them.
+-- special risks:
+--   - alter table adds nullable columns only; existing rows keep their status and get null
+--     review data. no policy or grant changes on public.trackers.
+--   - authenticated inserts with a status other than 'new' now fail (no app path does this).
+--   - only the latest review is stored; there is no per-entry review history.
+
+alter table public.trackers
+  add column reviewed_by uuid references public.users (id) on delete set null,
+  add column reviewed_at timestamptz,
+  add column review_note text;
+
+alter table public.trackers
+  add constraint trackers_review_note_length_check
+  check (review_note is null or pg_catalog.char_length(review_note) <= 500);
+
+-- fk lookups and on delete set null from public.users
+create index trackers_reviewed_by_idx on public.trackers (reviewed_by);
+
+comment on column public.trackers.reviewed_by is 'user who last approved or rejected the entry; set by trigger';
+comment on column public.trackers.reviewed_at is 'when the entry was last approved or rejected; set by trigger';
+comment on column public.trackers.review_note is 'reason given when the entry was rejected; set only with status rejected';
+
+-- security invoker: reads the caller's jwt and the entry owner's role from
+-- public.user_access, which managers and admins may already select through rls.
+create or replace function private.guard_tracker_review()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  caller_id uuid := (select auth.uid());
+  caller_role text := (select private.jwt_role());
+  owner_role public.user_role;
+begin
+  -- service role and sql sessions have no user; they are trusted (seeds, maintenance)
+  if caller_id is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.status <> 'new' then
+      raise exception 'New time entries must start unreviewed.'
+        using errcode = 'check_violation';
+    end if;
+
+    new.reviewed_by := null;
+    new.reviewed_at := null;
+    new.review_note := null;
+    return new;
+  end if;
+
+  -- no status change: review data stays as it was, whatever the client sent
+  if new.status = old.status then
+    new.reviewed_by := old.reviewed_by;
+    new.reviewed_at := old.reviewed_at;
+    new.review_note := old.review_note;
+    return new;
+  end if;
+
+  if caller_role is null or caller_role not in ('manager', 'admin') then
+    raise exception 'Only managers and admins can review time entries.'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  if caller_role = 'manager' then
+    if old.user_id = caller_id then
+      raise exception 'You cannot review your own time entries.'
+        using errcode = 'insufficient_privilege';
+    end if;
+
+    select ua.role into owner_role
+    from public.user_access ua
+    where ua.user_id = old.user_id;
+
+    -- fail closed when the owner's role cannot be read
+    if owner_role is null or owner_role = 'admin' then
+      raise exception 'Only an admin can review this time entry.'
+        using errcode = 'insufficient_privilege';
+    end if;
+  end if;
+
+  if not (
+    (old.status = 'new' and new.status in ('approved', 'rejected'))
+    or (old.status in ('approved', 'rejected') and new.status = 'new')
+  ) then
+    raise exception 'Undo the current review before changing it.'
+      using errcode = 'check_violation';
+  end if;
+
+  if (
+    new.date, new.description, new.duration_minutes, new.is_live, new.live_duration_minutes,
+    new.live_status, new.start_live_date, new.project_id, new.user_id, new.transaction_id
+  ) is distinct from (
+    old.date, old.description, old.duration_minutes, old.is_live, old.live_duration_minutes,
+    old.live_status, old.start_live_date, old.project_id, old.user_id, old.transaction_id
+  ) then
+    raise exception 'A review cannot change the entry itself.'
+      using errcode = 'check_violation';
+  end if;
+
+  if old.is_live and old.live_status in ('start', 'pause') then
+    raise exception 'A running timer cannot be reviewed.'
+      using errcode = 'check_violation';
+  end if;
+
+  -- undo: the entry is unreviewed again and its owner may edit it
+  if new.status = 'new' then
+    new.reviewed_by := null;
+    new.reviewed_at := null;
+    new.review_note := null;
+    return new;
+  end if;
+
+  if new.status = 'rejected' then
+    new.review_note := nullif(pg_catalog.btrim(new.review_note), '');
+
+    if new.review_note is null then
+      raise exception 'Add a reason to reject this time entry.'
+        using errcode = 'check_violation';
+    end if;
+  else
+    new.review_note := null;
+  end if;
+
+  new.reviewed_by := caller_id;
+  new.reviewed_at := pg_catalog.now();
+  return new;
+end;
+$$;
+
+comment on function private.guard_tracker_review() is
+  'before write trigger: enforces who may approve/reject tracker entries, allowed status moves, and stamps review data';
+
+revoke execute on function private.guard_tracker_review() from public, anon, authenticated;
+
+create trigger guard_tracker_review
+  before insert or update on public.trackers
+  for each row execute function private.guard_tracker_review();

@@ -31,7 +31,10 @@ const trackerRow = {
   start_live_date: '2026-11-05T11:00:00.000Z',
   project_id: 'project-1',
   user_id: 'user-1',
-  transaction_id: null
+  transaction_id: null,
+  reviewed_by: null,
+  reviewed_at: null,
+  review_note: null
 };
 
 const runningTracker: Tracker = {
@@ -48,7 +51,10 @@ const runningTracker: Tracker = {
   startLiveDate: '2026-11-05T11:58:30.000Z',
   projectId: 'project-1',
   userId: 'user-1',
-  transactionId: null
+  transactionId: null,
+  reviewedBy: null,
+  reviewedAt: null,
+  reviewNote: null
 };
 
 interface QueryResult {

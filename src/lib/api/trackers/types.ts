@@ -17,6 +17,9 @@ export interface Tracker {
   projectId: string;
   userId: string;
   transactionId: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
 }
 
 export interface CreateTrackerInput {

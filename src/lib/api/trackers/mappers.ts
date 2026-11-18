@@ -6,7 +6,7 @@ type InputTrackerRow = Database['public']['Tables']['trackers']['Insert'];
 export type UpdateTrackerRow = Database['public']['Tables']['trackers']['Update'];
 
 export const TRACKER_COLUMNS =
-  'id, created_at, updated_at, date, description, duration_minutes, is_live, live_duration_minutes, live_status, status, start_live_date, project_id, user_id, transaction_id';
+  'id, created_at, updated_at, date, description, duration_minutes, is_live, live_duration_minutes, live_status, status, start_live_date, project_id, user_id, transaction_id, reviewed_by, reviewed_at, review_note';
 
 export function mapTrackerRowToTracker(row: TrackerRow): Tracker {
   return {
@@ -23,7 +23,10 @@ export function mapTrackerRowToTracker(row: TrackerRow): Tracker {
     startLiveDate: row.start_live_date,
     projectId: row.project_id,
     userId: row.user_id,
-    transactionId: row.transaction_id
+    transactionId: row.transaction_id,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    reviewNote: row.review_note
   };
 }
 
