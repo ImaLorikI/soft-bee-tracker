@@ -27,11 +27,11 @@ import content from '../content.json';
 // one member's time for managers and admins to approve, reject or undo.
 // the trackers rls decides which entries come back (managers: their projects only)
 export function MemberTimeReview({ member, viewer, projectNames, memberNames }: MemberTimeReviewProps) {
-  const [range] = useState(() => getTrackerReviewRange(new Date()));
+  // recomputed each render so an open profile moves on when the month changes
+  const range = getTrackerReviewRange(new Date());
   const { data: trackers, isLoading, error, refetch } = useMemberTrackers({ userId: member.id, from: range.start, to: range.end });
-  const trackerIds = trackers?.map((tracker) => tracker.id) ?? [];
   // one request for the whole list; rls returns history only to managers and admins
-  const { data: reviews, error: reviewsError } = useTrackerReviews(trackerIds);
+  const { data: reviews, error: reviewsError } = useTrackerReviews({ userId: member.id, from: range.start, to: range.end });
   const reviewsByTracker = groupReviewsByTracker(reviews ?? []);
   const approveTracker = useApproveTracker();
   const [noteTarget, setNoteTarget] = useState<ReviewNoteTarget | null>(null);

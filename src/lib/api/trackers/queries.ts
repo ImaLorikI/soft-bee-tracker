@@ -19,7 +19,7 @@ export const trackerKeys = {
   list: () => [...trackerKeys.lists()] as const,
   project: (input: ProjectTrackersInput) => [...trackerKeys.all, 'project', input] as const,
   member: (input: MemberTrackersInput) => [...trackerKeys.all, 'member', input] as const,
-  reviews: (trackerIds: string[]) => [...trackerKeys.all, 'reviews', trackerIds] as const,
+  reviews: (input: MemberTrackersInput) => [...trackerKeys.all, 'reviews', input] as const,
   activeLive: () => [...trackerKeys.all, 'active-live'] as const
 };
 
@@ -130,18 +130,17 @@ export function useMemberTrackers(input: MemberTrackersInput) {
   });
 }
 
-// review history of the given entries, newest first. rls returns rows only to managers and
-// admins, for entries they can see; staff get an empty list
-export async function getTrackerReviews(trackerIds: string[]): Promise<TrackerReview[]> {
-  if (trackerIds.length === 0) {
-    return [];
-  }
-
+// review history of one member's entries in a date range, newest first. filtering through
+// the trackers join keeps the url and the cache key small, whatever the number of entries.
+// rls returns rows only to managers and admins, for entries they can see
+export async function getTrackerReviews({ userId, from, to }: MemberTrackersInput): Promise<TrackerReview[]> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase
     .from('tracker_reviews')
-    .select(TRACKER_REVIEW_COLUMNS)
-    .in('tracker_id', trackerIds)
+    .select(`${TRACKER_REVIEW_COLUMNS}, trackers!inner(user_id, date)`)
+    .eq('trackers.user_id', userId)
+    .gte('trackers.date', from)
+    .lte('trackers.date', to)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -154,11 +153,10 @@ export async function getTrackerReviews(trackerIds: string[]): Promise<TrackerRe
   return data.map(mapTrackerReviewRowToTrackerReview);
 }
 
-export function useTrackerReviews(trackerIds: string[]) {
+export function useTrackerReviews(input: MemberTrackersInput) {
   return useQuery<TrackerReview[], ApiError>({
-    queryKey: trackerKeys.reviews(trackerIds),
-    queryFn: () => getTrackerReviews(trackerIds),
-    enabled: trackerIds.length > 0
+    queryKey: trackerKeys.reviews(input),
+    queryFn: () => getTrackerReviews(input)
   });
 }
 

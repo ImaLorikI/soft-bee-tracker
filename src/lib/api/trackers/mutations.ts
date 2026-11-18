@@ -231,12 +231,10 @@ export function useDiscardLiveTracker() {
   return useTrackerMutation({ mutationFn: discardLiveTracker, successMessage: content.timerDiscarded });
 }
 
+// approving does not change any crew totals (only rejected time is left out), so the crew
+// snapshot stays cached; reject and undo do change them
 export function useApproveTracker() {
-  return useTrackerMutation({
-    mutationFn: approveTracker,
-    successMessage: content.entryApproved,
-    extraInvalidateKeys: REVIEW_INVALIDATE_KEYS
-  });
+  return useTrackerMutation({ mutationFn: approveTracker, successMessage: content.entryApproved });
 }
 
 export function useRejectTracker(options?: UseTrackerMutationOptions) {
@@ -257,7 +255,7 @@ export function useUndoTrackerReview(options?: UseTrackerMutationOptions) {
   });
 }
 
-// reviews also change the crew snapshot, which holds tracker rows for team summaries
+// reject and undo change the crew snapshot: its time totals leave rejected entries out
 const REVIEW_INVALIDATE_KEYS: QueryKey[] = [crewKeys.all];
 
 function useTrackerMutation<TInput>({ mutationFn, successMessage, options, extraInvalidateKeys = [] }: TrackerMutationConfig<TInput>) {
