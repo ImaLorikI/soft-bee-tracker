@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { format } from 'date-fns';
@@ -32,6 +32,13 @@ interface UseTrackerMutationOptions {
   onSuccess?: (tracker: Tracker) => void;
 }
 
+interface TrackerMutationConfig<TInput> {
+  mutationFn: (input: TInput) => Promise<Tracker>;
+  successMessage: string;
+  options?: UseTrackerMutationOptions;
+  extraInvalidateKeys?: QueryKey[];
+}
+
 export async function createTracker(input: CreateTrackerInput): Promise<Tracker> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase
@@ -51,19 +58,7 @@ export async function createTracker(input: CreateTrackerInput): Promise<Tracker>
 }
 
 export function useCreateTracker(options?: UseTrackerMutationOptions) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: createTracker,
-    onSuccess: (tracker) => {
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.all });
-      toast.success(content.created);
-      options?.onSuccess?.(tracker);
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message);
-    }
-  });
+  return useTrackerMutation({ mutationFn: createTracker, successMessage: content.created, options });
 }
 
 export async function startLiveTracker(input: StartLiveTrackerInput): Promise<Tracker> {
@@ -221,55 +216,66 @@ async function updateLiveTracker(trackerId: string, changes: UpdateTrackerRow): 
 }
 
 export function useStartLiveTracker(options?: UseTrackerMutationOptions) {
-  return useTrackerMutation(startLiveTracker, content.timerStarted, options);
+  return useTrackerMutation({ mutationFn: startLiveTracker, successMessage: content.timerStarted, options });
 }
 
 export function usePauseLiveTracker() {
-  return useTrackerMutation(pauseLiveTracker, content.timerPaused);
+  return useTrackerMutation({ mutationFn: pauseLiveTracker, successMessage: content.timerPaused });
 }
 
 export function useResumeLiveTracker() {
-  return useTrackerMutation(resumeLiveTracker, content.timerResumed);
+  return useTrackerMutation({ mutationFn: resumeLiveTracker, successMessage: content.timerResumed });
 }
 
 export function useFinishLiveTracker(options?: UseTrackerMutationOptions) {
-  return useTrackerMutation(finishLiveTracker, content.entrySaved, options);
+  return useTrackerMutation({ mutationFn: finishLiveTracker, successMessage: content.entrySaved, options });
 }
 
 export function useRestartLiveTracker() {
-  return useTrackerMutation(restartLiveTracker, content.timerResumed);
+  return useTrackerMutation({ mutationFn: restartLiveTracker, successMessage: content.timerResumed });
 }
 
 export function useUpdateTracker(options?: UseTrackerMutationOptions) {
-  return useTrackerMutation(updateTracker, content.entryUpdated, options);
+  return useTrackerMutation({ mutationFn: updateTracker, successMessage: content.entryUpdated, options });
 }
 
 export function useDeleteTracker(options?: UseTrackerMutationOptions) {
-  return useTrackerMutation(deleteTracker, content.entryDeleted, options);
+  return useTrackerMutation({ mutationFn: deleteTracker, successMessage: content.entryDeleted, options });
 }
 
 export function useDiscardLiveTracker() {
-  return useTrackerMutation(discardLiveTracker, content.timerDiscarded);
+  return useTrackerMutation({ mutationFn: discardLiveTracker, successMessage: content.timerDiscarded });
 }
 
 export function useApproveTracker() {
-  return useTrackerReviewMutation(approveTracker, content.entryApproved);
+  return useTrackerMutation({
+    mutationFn: approveTracker,
+    successMessage: content.entryApproved,
+    extraInvalidateKeys: REVIEW_INVALIDATE_KEYS
+  });
 }
 
 export function useRejectTracker(options?: UseTrackerMutationOptions) {
-  return useTrackerReviewMutation(rejectTracker, content.entryRejected, options);
+  return useTrackerMutation({
+    mutationFn: rejectTracker,
+    successMessage: content.entryRejected,
+    options,
+    extraInvalidateKeys: REVIEW_INVALIDATE_KEYS
+  });
 }
 
 export function useUndoTrackerReview() {
-  return useTrackerReviewMutation(undoTrackerReview, content.reviewUndone);
+  return useTrackerMutation({
+    mutationFn: undoTrackerReview,
+    successMessage: content.reviewUndone,
+    extraInvalidateKeys: REVIEW_INVALIDATE_KEYS
+  });
 }
 
 // reviews also change the crew snapshot, which holds tracker rows for team summaries
-function useTrackerReviewMutation<TInput>(
-  mutationFn: (input: TInput) => Promise<Tracker>,
-  successMessage: string,
-  options?: UseTrackerMutationOptions
-) {
+const REVIEW_INVALIDATE_KEYS: QueryKey[] = [crewKeys.all];
+
+function useTrackerMutation<TInput>({ mutationFn, successMessage, options, extraInvalidateKeys = [] }: TrackerMutationConfig<TInput>) {
   const queryClient = useQueryClient();
 
   return useMutation<Tracker, ApiError, TInput>({
@@ -282,28 +288,9 @@ function useTrackerReviewMutation<TInput>(
       toast.error(error.message);
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.all });
-      void queryClient.invalidateQueries({ queryKey: crewKeys.all });
-    }
-  });
-}
-
-function useTrackerMutation<TInput>(
-  mutationFn: (input: TInput) => Promise<Tracker>,
-  successMessage: string,
-  options?: UseTrackerMutationOptions
-) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn,
-    onSuccess: (tracker) => {
-      void queryClient.invalidateQueries({ queryKey: trackerKeys.all });
-      toast.success(successMessage);
-      options?.onSuccess?.(tracker);
-    },
-    onError: (error: ApiError) => {
-      toast.error(error.message);
+      for (const queryKey of [trackerKeys.all, ...extraInvalidateKeys]) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     }
   });
 }

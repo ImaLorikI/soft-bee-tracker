@@ -58,21 +58,7 @@ export async function getTrackers(): Promise<Tracker[]> {
     return [];
   }
 
-  const { data, error, status } = await supabase
-    .from('trackers')
-    .select(TRACKER_COLUMNS)
-    .eq('user_id', userData.user.id)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    throw {
-      message: error.message,
-      statusCode: status
-    } satisfies ApiError;
-  }
-
-  return mapTrackersRowsToTrackers(data);
+  return fetchUserTrackers({ userId: userData.user.id });
 }
 
 export function useTrackers() {
@@ -124,18 +110,29 @@ export function useActiveLiveTracker() {
   });
 }
 
-// one person's entries for review, newest first. rls limits managers to the projects they
-// manage, so a manager may see only part of a member's time
-export async function getMemberTrackers({ userId, from, to }: MemberTrackersInput): Promise<Tracker[]> {
+// one person's entries for review. rls limits managers to the projects they manage, so a
+// manager may see only part of a member's time
+export function getMemberTrackers({ userId, from, to }: MemberTrackersInput): Promise<Tracker[]> {
+  return fetchUserTrackers({ userId, range: { from, to } });
+}
+
+export function useMemberTrackers(input: MemberTrackersInput) {
+  return useQuery<Tracker[], ApiError>({
+    queryKey: trackerKeys.member(input),
+    queryFn: () => getMemberTrackers(input)
+  });
+}
+
+// newest day first, then in the order they were logged
+async function fetchUserTrackers({ userId, range }: FetchUserTrackersInput): Promise<Tracker[]> {
   const supabase = createBrowserClient();
-  const { data, error, status } = await supabase
-    .from('trackers')
-    .select(TRACKER_COLUMNS)
-    .eq('user_id', userId)
-    .gte('date', from)
-    .lte('date', to)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: true });
+  let query = supabase.from('trackers').select(TRACKER_COLUMNS).eq('user_id', userId);
+
+  if (range) {
+    query = query.gte('date', range.from).lte('date', range.to);
+  }
+
+  const { data, error, status } = await query.order('date', { ascending: false }).order('created_at', { ascending: true });
 
   if (error) {
     throw {
@@ -147,9 +144,7 @@ export async function getMemberTrackers({ userId, from, to }: MemberTrackersInpu
   return mapTrackersRowsToTrackers(data);
 }
 
-export function useMemberTrackers(input: MemberTrackersInput) {
-  return useQuery<Tracker[], ApiError>({
-    queryKey: trackerKeys.member(input),
-    queryFn: () => getMemberTrackers(input)
-  });
+interface FetchUserTrackersInput {
+  userId: string;
+  range?: { from: string; to: string };
 }
