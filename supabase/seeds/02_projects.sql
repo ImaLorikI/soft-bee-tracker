@@ -50,7 +50,8 @@ set
   type = excluded.type,
   manager_id = excluded.manager_id;
 
--- assign the seeded worker; the membership trigger creates a rate row (default 0)
+-- assign the seeded worker; the membership trigger creates a rate row with rate left null.
+-- internal operations is a deliberate zero; the other two are real hourly rates.
 insert into public.project_members (project_id, user_id)
 values
   ('00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03'),

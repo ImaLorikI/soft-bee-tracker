@@ -3,7 +3,7 @@
 --   manager, same as the old project_rates rows); public.project_rates keeps only the
 --   rate and is created/removed with each membership row. projects.manager_id stays.
 -- affected objects: table public.project_members (new); public.project_rates (fk to
---   members); private.is_project_manager(uuid), private.is_project_member(uuid),
+--   members, rate nullable with no default); private.is_project_manager(uuid), private.is_project_member(uuid),
 --   private.accessible_project_ids(); public.add_project_manager_membership(),
 --   public.ensure_project_member_rate(); public.create_project(...),
 --   public.get_project_people(); policies on public.project_members and
@@ -15,16 +15,18 @@
 -- special risks: membership writes move from project_rates to project_members; app code
 --   that still inserts into project_rates for membership will fail until updated.
 --   existing (project_id, user_id) pairs are copied into project_members.
+--   every stored rate of 0 becomes null: nothing has written a rate, so 0 was the
+--   column default and cannot be told apart from "not set".
 
 -- ---------------------------------------------------------------------------
 -- project_members
 -- ---------------------------------------------------------------------------
 
+-- membership rows are inserted or deleted, never updated, so there is no updated_at
 create table public.project_members (
   project_id uuid not null references public.projects (id) on delete cascade,
   user_id uuid not null references public.users (id) on delete cascade,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
   primary key (project_id, user_id)
 );
 
@@ -33,10 +35,6 @@ comment on table public.project_members is
 
 -- covers lookups by user_id that return project_id (accessible_project_ids) as index-only scans
 create index project_members_user_id_idx on public.project_members (user_id) include (project_id);
-
-create trigger set_project_members_updated_at
-  before update on public.project_members
-  for each row execute function public.trigger_set_updated_at();
 
 alter table public.project_members enable row level security;
 
@@ -47,13 +45,15 @@ create policy "require secure session"
   using ((select private.is_secure()))
   with check ((select private.is_secure()));
 
-grant all on table public.project_members to service_role;
--- update is withheld: the row is its key, so membership changes are insert and delete
+-- safety: revokes only remove supabase default privileges on this brand-new table.
+-- update stays withheld: the row is its key, so membership changes are insert and delete.
+revoke all on table public.project_members from anon, authenticated;
 grant select, insert, delete on table public.project_members to authenticated;
+grant all on table public.project_members to service_role;
 
 -- safety: copy every current assignment, including the responsible manager
-insert into public.project_members (project_id, user_id, created_at, updated_at)
-select pr.project_id, pr.user_id, pr.created_at, pr.updated_at
+insert into public.project_members (project_id, user_id, created_at)
+select pr.project_id, pr.user_id, pr.created_at
 from public.project_rates pr
 on conflict (project_id, user_id) do nothing;
 
@@ -78,9 +78,28 @@ alter table public.project_rates
 comment on table public.project_rates is
   'hourly rate for a project member; created and removed with the membership row';
 
--- security definer justification: every member must have a rate row (default 0), including
--- when membership is written by other security definer triggers; only inserts the matching
--- (project_id, user_id) pair.
+-- safety: drop the 0 default and not-null. a missing rate must not look like a free hour.
+-- null means unset; 0 stays available for a member who is deliberately unpaid.
+-- the following update rewrites placeholder zeros only. the updated_at trigger is off so
+-- those rows are not marked as edited.
+alter table public.project_rates
+  alter column rate drop default,
+  alter column rate drop not null;
+
+comment on column public.project_rates.rate is
+  'hourly rate for this member; null until a rate is set. 0 is a real zero';
+
+alter table public.project_rates disable trigger set_project_rates_updated_at;
+
+update public.project_rates
+set rate = null
+where rate = 0;
+
+alter table public.project_rates enable trigger set_project_rates_updated_at;
+
+-- security definer justification: every member must have a rate row (rate left null until
+-- it is set), including when membership is written by other security definer triggers;
+-- only inserts the matching (project_id, user_id) pair.
 create or replace function public.ensure_project_member_rate()
 returns trigger
 language plpgsql

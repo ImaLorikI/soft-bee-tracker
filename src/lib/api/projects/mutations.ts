@@ -110,11 +110,11 @@ export function useUpdateProjectStatus() {
 }
 
 export function useAddProjectMember() {
-  return useProjectMemberMutation(addProjectMember);
+  return useProjectMutation(addProjectMember);
 }
 
 export function useRemoveProjectMember() {
-  return useProjectMemberMutation(removeProjectMember);
+  return useProjectMutation(removeProjectMember);
 }
 
 function useProjectMutation<TInput, TResult>(mutationFn: (input: TInput) => Promise<TResult>) {
@@ -126,19 +126,9 @@ function useProjectMutation<TInput, TResult>(mutationFn: (input: TInput) => Prom
   });
 }
 
-// the database adds or removes the member's rate row together with the membership,
-// and the crew page reads the same membership for leave conflicts and manager names
-function useProjectMemberMutation(mutationFn: (input: ProjectMemberInput) => Promise<void>) {
-  const queryClient = useQueryClient();
-
-  return useMutation<void, ApiError, ProjectMemberInput>({
-    mutationFn,
-    onSuccess: () => invalidateProjectAndCrew(queryClient)
-  });
-}
-
-// crew reads projects and project_members. creating or updating a project rewrites
-// those rows, including the responsible manager's membership.
+// crew reads projects and project_members. project writes rewrite membership,
+// including the responsible manager, and adding or removing a member also
+// creates or drops that person's rate row.
 function invalidateProjectAndCrew(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: projectKeys.all }),

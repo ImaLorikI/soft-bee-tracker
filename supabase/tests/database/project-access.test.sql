@@ -1,6 +1,6 @@
 begin;
 
-select plan(34);
+select plan(36);
 
 -- seeded: admin a01, manager a02 (responsible for the seeded projects), worker a03.
 -- two more managers are added here.
@@ -39,6 +39,13 @@ select is(
    where project_id = '00000000-0000-0000-0000-00000000fb01'),
   2,
   'membership trigger also creates a rate row for each member'
+);
+
+select is(
+  (select bool_and(rate is null) from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  true,
+  'a new membership leaves the rate unset'
 );
 
 select is(
@@ -98,6 +105,18 @@ select is(
   'a project manager can still update a member rate'
 );
 
+update public.project_rates set rate = 0
+where project_id = '00000000-0000-0000-0000-00000000fb01'
+  and user_id = '00000000-0000-0000-0000-000000000a03';
+
+select is(
+  (select rate from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  0.00::numeric,
+  'zero is a stored rate, distinct from an unset rate'
+);
+
 select throws_ok(
   $$update public.project_rates set user_id = '00000000-0000-0000-0000-00000000f003'
     where project_id = '00000000-0000-0000-0000-00000000fb01'
@@ -107,15 +126,12 @@ select throws_ok(
   'a rate row can only change its rate'
 );
 
-update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'
-where project_id = '00000000-0000-0000-0000-00000000fb01'
-  and user_id = '00000000-0000-0000-0000-000000000a03';
-
-select is(
-  (select user_id::text from public.project_members
-   where project_id = '00000000-0000-0000-0000-00000000fb01'
-     and user_id = '00000000-0000-0000-0000-000000000a03'),
-  '00000000-0000-0000-0000-000000000a03',
+select throws_ok(
+  $$update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'
+    where project_id = '00000000-0000-0000-0000-00000000fb01'
+      and user_id = '00000000-0000-0000-0000-000000000a03'$$,
+  '42501',
+  null,
   'membership cannot be updated'
 );
 
