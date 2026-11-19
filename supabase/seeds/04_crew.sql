@@ -82,13 +82,23 @@ from (
 ) as profile (id, position, employed_since)
 where u.id = profile.id;
 
-insert into public.project_rates (project_id, user_id, rate)
+insert into public.project_members (project_id, user_id)
 values
-  ('00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a04', 40.00),
-  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a04', 40.00),
-  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a05', 35.00)
-on conflict (project_id, user_id) do update
-set rate = excluded.rate;
+  ('00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a04'),
+  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a04'),
+  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a05')
+on conflict (project_id, user_id) do nothing;
+
+update public.project_rates as pr
+set rate = seeded.rate
+from (
+  values
+    ('00000000-0000-0000-0000-000000000b01'::uuid, '00000000-0000-0000-0000-000000000a04'::uuid, 40.00),
+    ('00000000-0000-0000-0000-000000000b02'::uuid, '00000000-0000-0000-0000-000000000a04'::uuid, 40.00),
+    ('00000000-0000-0000-0000-000000000b02'::uuid, '00000000-0000-0000-0000-000000000a05'::uuid, 35.00)
+) as seeded (project_id, user_id, rate)
+where pr.project_id = seeded.project_id
+  and pr.user_id = seeded.user_id;
 
 -- approved time entries on the last few days (never in the future), so this week
 -- and this month both have totals

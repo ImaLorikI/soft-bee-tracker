@@ -1,7 +1,8 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import { crewKeys } from '@/lib/api/crew/queries';
 import { mapCreateProjectArgs, mapProjectChangesToRow, mapProjectRowToProject, PROJECT_COLUMNS } from '@/lib/api/projects/mappers';
 import { projectKeys } from '@/lib/api/projects/queries';
 import type {
@@ -74,7 +75,7 @@ export async function updateProjectStatus({ projectId, status }: UpdateProjectSt
 // the person's role decides their rights: managers and admins can manage the project
 export async function addProjectMember({ projectId, userId }: ProjectMemberInput): Promise<void> {
   const supabase = createBrowserClient();
-  const { error, status } = await supabase.from('project_rates').insert({ project_id: projectId, user_id: userId });
+  const { error, status } = await supabase.from('project_members').insert({ project_id: projectId, user_id: userId });
 
   if (error) {
     throw {
@@ -86,7 +87,7 @@ export async function addProjectMember({ projectId, userId }: ProjectMemberInput
 
 export async function removeProjectMember({ projectId, userId }: ProjectMemberInput): Promise<void> {
   const supabase = createBrowserClient();
-  const { error, status } = await supabase.from('project_rates').delete().eq('project_id', projectId).eq('user_id', userId);
+  const { error, status } = await supabase.from('project_members').delete().eq('project_id', projectId).eq('user_id', userId);
 
   if (error) {
     throw {
@@ -121,6 +122,16 @@ function useProjectMutation<TInput, TResult>(mutationFn: (input: TInput) => Prom
 
   return useMutation<TResult, ApiError, TInput>({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.all })
+    onSuccess: () => invalidateProjectAndCrew(queryClient)
   });
+}
+
+// crew reads projects and project_members. project writes rewrite membership,
+// including the responsible manager, and adding or removing a member also
+// creates or drops that person's rate row.
+function invalidateProjectAndCrew(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: projectKeys.all }),
+    queryClient.invalidateQueries({ queryKey: crewKeys.all })
+  ]);
 }

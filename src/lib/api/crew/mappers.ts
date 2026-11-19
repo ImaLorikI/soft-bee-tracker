@@ -19,12 +19,12 @@ type Tables = Database['public']['Tables'];
 export const CREW_USER_COLUMNS =
   'id, email, username, first_name, last_name, phone, linkedin, upwork, avatar_url, date_employment, positions, user_access(role, is_confirmed, is_blocked)';
 export const CREW_PROJECT_COLUMNS = 'id, name, status, manager_id';
-export const CREW_PROJECT_RATE_COLUMNS = 'project_id, user_id';
+export const CREW_PROJECT_MEMBER_COLUMNS = 'project_id, user_id';
 export const CREW_LEAVE_REQUEST_COLUMNS = 'id, user_id, leave_type, start_date, end_date, note, status';
 export const CREW_LEAVE_ALLOWANCE_COLUMNS = 'id, user_id, year, leave_type, days';
 
 export function buildCrew(rows: CrewRows, now: Date): Crew {
-  const projects = buildCrewProjects(rows.projects, rows.projectRates);
+  const projects = buildCrewProjects(rows.projects, rows.projectMembers);
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const minutes = sumMemberMinutes(rows.trackers, projectsById, now);
 
@@ -104,13 +104,13 @@ export function mapGrantLeaveInputToRow(input: GrantLeaveInput): Tables['leave_r
   };
 }
 
-function buildCrewProjects(projectRows: CrewProjectRow[], rateRows: CrewProjectRateRow[]): CrewProject[] {
+function buildCrewProjects(projectRows: CrewProjectRow[], memberRows: CrewProjectMemberRow[]): CrewProject[] {
   return projectRows.map((row) => ({
     id: row.id,
     name: row.name,
     status: row.status,
     managerId: row.manager_id,
-    memberIds: rateRows.filter((rate) => rate.project_id === row.id).map((rate) => rate.user_id)
+    memberIds: memberRows.filter((member) => member.project_id === row.id).map((member) => member.user_id)
   }));
 }
 
@@ -193,7 +193,7 @@ export interface CrewUserRow extends Pick<
 }
 
 type CrewProjectRow = Pick<Tables['projects']['Row'], 'id' | 'name' | 'status' | 'manager_id'>;
-type CrewProjectRateRow = Pick<Tables['project_rates']['Row'], 'project_id' | 'user_id'>;
+type CrewProjectMemberRow = Pick<Tables['project_members']['Row'], 'project_id' | 'user_id'>;
 type CrewLeaveRequestRow = Pick<
   Tables['leave_requests']['Row'],
   'id' | 'user_id' | 'leave_type' | 'start_date' | 'end_date' | 'note' | 'status'
@@ -203,7 +203,7 @@ type CrewLeaveAllowanceRow = Pick<Tables['leave_allowances']['Row'], 'id' | 'use
 export interface CrewRows {
   users: CrewUserRow[];
   projects: CrewProjectRow[];
-  projectRates: CrewProjectRateRow[];
+  projectMembers: CrewProjectMemberRow[];
   trackers: Tracker[];
   leaveRequests: CrewLeaveRequestRow[];
   allowances: CrewLeaveAllowanceRow[];

@@ -59,7 +59,7 @@ const ROWS: CrewRows = {
     { id: 'p1', name: 'Atlas', status: 'active', manager_id: 'bob' },
     { id: 'p2', name: 'Old', status: 'archived', manager_id: 'bob' }
   ],
-  projectRates: [
+  projectMembers: [
     { project_id: 'p1', user_id: 'ann' },
     { project_id: 'p2', user_id: 'ann' }
   ],
