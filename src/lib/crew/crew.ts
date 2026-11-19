@@ -6,8 +6,8 @@ import { computeLeaveBalances, type LeaveBalance } from '@/lib/leave/leave-days'
 import type { CrewLeaveRequest, CrewMember, CrewStatus, CrewViewer } from '@/lib/api/crew';
 import type { LeaveAllowance, LeaveType } from '@/lib/api/leave';
 import type { Tracker } from '@/lib/api/trackers';
-import { isLiveTrackerActive } from '@/lib/live-tracker';
-import { getPeriodRange, type DateKeyRange } from '@/lib/tracker-summary';
+import { isLiveTrackerActive } from '@/lib/tracker/live-tracker';
+import { getPeriodRange, type DateKeyRange } from '@/lib/tracker/tracker-summary';
 
 export function getCrewPermissions(role: UserRole): CrewPermissions {
   return CREW_PERMISSIONS[role];

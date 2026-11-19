@@ -18,11 +18,11 @@ import {
   type TrackerReview,
   type TrackerStatus
 } from '@/lib/api/trackers';
-import { canReviewTracker, getFullName, getTrackerReviewRange } from '@/lib/crew';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { isLiveTrackerActive } from '@/lib/live-tracker';
 import content from '../content.json';
+import { formatText } from '@/lib/format/format-text';
+import { isLiveTrackerActive } from '@/lib/tracker/live-tracker';
+import { formatClock } from '@/lib/format/format-duration';
+import { canReviewTracker, getFullName, getTrackerReviewRange } from '@/lib/crew/crew';
 
 // one member's time for managers and admins to approve, reject or undo.
 // the trackers rls decides which entries come back (managers: their projects only)

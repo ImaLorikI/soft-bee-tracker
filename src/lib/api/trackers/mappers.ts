@@ -3,6 +3,8 @@ import type { Database } from '@/types';
 import type { ApiError } from '@/types/api-error';
 import content from './content.json';
 
+export const TRACKER_STATUS_CHANGED_CODE = 'tracker_review.status_changed';
+
 type TrackerRow = Database['public']['Tables']['trackers']['Row'];
 type InputTrackerRow = Database['public']['Tables']['trackers']['Insert'];
 export type UpdateTrackerRow = Database['public']['Tables']['trackers']['Update'];
@@ -76,19 +78,23 @@ export function mapStartLiveTrackerInputToRow(input: StartLiveTrackerInput, star
 // hint keys come from private.guard_tracker_review; matching keys (not message text) keeps the
 // mapping stable if the database wording changes
 export function mapTrackerReviewErrorToApiError(error: TrackerDatabaseError, statusCode: number): ApiError {
+  if (error.code === NO_ROWS_ERROR_CODE) {
+    // no row matched id + expected status: deleted, already reviewed/changed, or rls hid it
+    return {
+      message: content.reviewErrors.statusChanged,
+      statusCode,
+      code: TRACKER_STATUS_CHANGED_CODE
+    };
+  }
+
   return {
-    message: getTrackerReviewErrorMessage(error),
+    message: REVIEW_ERROR_MESSAGES[error.hint ?? ''] ?? content.reviewErrors.unexpected,
     statusCode
   };
 }
 
-function getTrackerReviewErrorMessage(error: TrackerDatabaseError): string {
-  // no row came back: rls hid the entry from this viewer (another manager's project) or it was deleted
-  if (error.code === NO_ROWS_ERROR_CODE) {
-    return content.reviewErrors.notAllowed;
-  }
-
-  return REVIEW_ERROR_MESSAGES[error.hint ?? ''] ?? content.reviewErrors.unexpected;
+export function isTrackerStatusChangedError(error: ApiError): boolean {
+  return error.code === TRACKER_STATUS_CHANGED_CODE;
 }
 
 // any other tracker write (log, edit, timer, delete): a review key gets its message, so a

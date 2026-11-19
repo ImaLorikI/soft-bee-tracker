@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldError, FieldLabel } from '@ui/field';
 import { Textarea } from '@ui/textarea';
 import { useRejectTracker, useUndoTrackerReview, type Tracker } from '@/lib/api/trackers';
-import { formatText } from '@/lib/format-text';
 import { REVIEW_NOTE_FORM_DEFAULTS, reviewNoteFormSchema, type ReviewNoteFormValues } from '@/lib/schemas/review-note-form.schema';
 import content from '../content.json';
+import { formatText } from '@/lib/format/format-text';
 
 // asks for the reason a review action needs: rejecting an entry or undoing a review.
 // open while `target` is set; the parent clears it to close
@@ -25,17 +25,18 @@ export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: Re
     defaultValues: REVIEW_NOTE_FORM_DEFAULTS,
     resolver: zodResolver(reviewNoteFormSchema)
   });
-  const rejectTracker = useRejectTracker({ onSuccess: handleDone });
-  const undoReview = useUndoTrackerReview({ onSuccess: handleDone });
-  const mode: ReviewNoteMode = target?.mode ?? 'reject';
-  const copy = content.reviewNoteDialog[mode];
-  const isBusy = rejectTracker.isPending || undoReview.isPending;
-  const SubmitIcon = mode === 'reject' ? XIcon : Undo2Icon;
 
   function handleDone() {
     reset(REVIEW_NOTE_FORM_DEFAULTS);
     onClose();
   }
+
+  const rejectTracker = useRejectTracker({ onSuccess: handleDone, onConcurrentStatusChange: handleDone });
+  const undoReview = useUndoTrackerReview({ onSuccess: handleDone, onConcurrentStatusChange: handleDone });
+  const mode: ReviewNoteMode = target?.mode ?? 'reject';
+  const copy = content.reviewNoteDialog[mode];
+  const isBusy = rejectTracker.isPending || undoReview.isPending;
+  const SubmitIcon = mode === 'reject' ? XIcon : Undo2Icon;
 
   function handleNoteSubmit(values: ReviewNoteFormValues) {
     if (!target) {

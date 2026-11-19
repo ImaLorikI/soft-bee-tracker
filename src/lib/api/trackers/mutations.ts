@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 
 import { crewKeys } from '@/lib/api/crew/queries';
 import {
+  isTrackerStatusChangedError,
   mapCreateTrackerInputToRow,
   mapStartLiveTrackerInputToRow,
   mapTrackerReviewErrorToApiError,
@@ -22,6 +23,7 @@ import type {
   StartLiveTrackerInput,
   Tracker,
   TrackerReviewNoteInput,
+  TrackerStatus,
   UpdateTrackerInput
 } from '@/lib/api/trackers/types';
 import { getLiveElapsedMinutes, getLiveWholeMinutes } from '@/lib/tracker/live-tracker';
@@ -29,8 +31,13 @@ import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 import content from './content.json';
 
+// 2× the Toaster default in @ui/sonner (2500ms) so concurrent-status warnings stay readable
+const WARNING_TOAST_DURATION_MS = 5000;
+
 interface UseTrackerMutationOptions {
-  onSuccess?: (tracker: Tracker) => void;
+  onSuccess?: () => void;
+  // status already moved by another reviewer — UI should refresh / close review dialogs
+  onConcurrentStatusChange?: () => void;
 }
 
 interface TrackerMutationConfig<TInput> {
@@ -145,24 +152,32 @@ export async function deleteTracker(tracker: Tracker): Promise<Tracker> {
   return tracker;
 }
 
-// no status filter: the review trigger rejects an invalid move (e.g. an entry another reviewer
-// already decided) with its own key, so "no row returned" only means the viewer has no access
+// optimistic status filter: only update when the row is still in the expected previous status.
+// a same-status retry (e.g. approve on already approved) would otherwise succeed silently because
+// the review trigger treats new.status = old.status as a no-op; "no row returned" then means the
+// status already moved (or the viewer has no access / the row was deleted)
 export function approveTracker(trackerId: string): Promise<Tracker> {
-  return updateTrackerReview(trackerId, { status: 'approved' });
+  return updateTrackerReview(trackerId, { status: 'approved' }, ['new']);
 }
 
 export function rejectTracker({ trackerId, note }: TrackerReviewNoteInput): Promise<Tracker> {
-  return updateTrackerReview(trackerId, { status: 'rejected', review_note: note.trim() });
+  return updateTrackerReview(trackerId, { status: 'rejected', review_note: note.trim() }, ['new']);
 }
 
 // the reason is not kept on the entry: the trigger moves it into tracker_reviews
 export function undoTrackerReview({ trackerId, note }: TrackerReviewNoteInput): Promise<Tracker> {
-  return updateTrackerReview(trackerId, { status: 'new', review_note: note.trim() });
+  return updateTrackerReview(trackerId, { status: 'new', review_note: note.trim() }, ['approved', 'rejected']);
 }
 
-async function updateTrackerReview(trackerId: string, changes: UpdateTrackerRow): Promise<Tracker> {
+async function updateTrackerReview(trackerId: string, changes: UpdateTrackerRow, expectedStatuses: TrackerStatus[]): Promise<Tracker> {
   const supabase = createBrowserClient();
-  const { data, error, status } = await supabase.from('trackers').update(changes).eq('id', trackerId).select(TRACKER_COLUMNS).single();
+  const { data, error, status } = await supabase
+    .from('trackers')
+    .update(changes)
+    .eq('id', trackerId)
+    .in('status', expectedStatuses)
+    .select(TRACKER_COLUMNS)
+    .single();
 
   if (error) {
     throw mapTrackerReviewErrorToApiError(error, status);
@@ -263,11 +278,17 @@ function useTrackerMutation<TInput>({ mutationFn, successMessage, options, extra
 
   return useMutation<Tracker, ApiError, TInput>({
     mutationFn,
-    onSuccess: (tracker) => {
+    onSuccess: () => {
       toast.success(successMessage);
-      options?.onSuccess?.(tracker);
+      options?.onSuccess?.();
     },
     onError: (error) => {
+      if (isTrackerStatusChangedError(error)) {
+        toast.warning(error.message, { duration: WARNING_TOAST_DURATION_MS });
+        options?.onConcurrentStatusChange?.();
+        return;
+      }
+
       toast.error(error.message);
     },
     onSettled: () => {

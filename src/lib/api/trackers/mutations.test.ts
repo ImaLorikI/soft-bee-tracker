@@ -216,7 +216,7 @@ describe('tracker review mutations', () => {
     createBrowserClient.mockReset();
   });
 
-  it('approves an entry and leaves status rules to the database', async () => {
+  it('approves only while the entry is still unreviewed', async () => {
     const { builder, from } = mockTrackersTable({ data: { ...trackerRow, status: 'approved' }, error: null, status: 200 });
 
     const tracker = await approveTracker('tracker-1');
@@ -224,24 +224,26 @@ describe('tracker review mutations', () => {
     expect(from).toHaveBeenCalledWith('trackers');
     expect(builder.update).toHaveBeenCalledWith({ status: 'approved' });
     expect(builder.eq).toHaveBeenCalledWith('id', 'tracker-1');
-    expect(builder.in).not.toHaveBeenCalled();
+    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
     expect(tracker.status).toBe('approved');
   });
 
-  it('rejects an entry with a trimmed reason', async () => {
+  it('rejects only while the entry is still unreviewed', async () => {
     const { builder } = mockTrackersTable();
 
     await rejectTracker({ trackerId: 'tracker-1', note: '  Wrong project  ' });
 
     expect(builder.update).toHaveBeenCalledWith({ status: 'rejected', review_note: 'Wrong project' });
+    expect(builder.in).toHaveBeenCalledWith('status', ['new']);
   });
 
-  it('undoes a review with a trimmed reason', async () => {
+  it('undoes a review only while the entry is still reviewed', async () => {
     const { builder } = mockTrackersTable();
 
     await undoTrackerReview({ trackerId: 'tracker-1', note: '  Approved the wrong day ' });
 
     expect(builder.update).toHaveBeenCalledWith({ status: 'new', review_note: 'Approved the wrong day' });
+    expect(builder.in).toHaveBeenCalledWith('status', ['approved', 'rejected']);
   });
 
   it.each([
@@ -269,7 +271,7 @@ describe('tracker review mutations', () => {
     await expect(approveTracker('tracker-1')).rejects.toEqual({ message, statusCode: status });
   });
 
-  it("reports no access when rls returns no row (another manager's project)", async () => {
+  it('reports a concurrent status change when no row matches the expected status', async () => {
     mockTrackersTable({
       data: null,
       error: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' },
@@ -277,8 +279,9 @@ describe('tracker review mutations', () => {
     });
 
     await expect(approveTracker('tracker-1')).rejects.toEqual({
-      message: "You can't review this entry. It may be on a project you don't manage.",
-      statusCode: 406
+      message: 'Your action was cancelled because this entry was deleted or changed by someone else.',
+      statusCode: 406,
+      code: 'tracker_review.status_changed'
     });
   });
 
