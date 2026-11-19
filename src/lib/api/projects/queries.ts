@@ -3,9 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getSessionViewer } from '@/lib/api/auth/viewer';
-import { mapProjectMemberRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, toProjectRecords } from '@/lib/api/projects/mappers';
-import type { MemberProject, Project, ProjectMember, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
 import { fetchVisibleProjects } from '@/lib/api/projects/visible-projects';
+import { mapProjectRecordRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, PROJECT_RECORD_COLUMNS } from '@/lib/api/projects/mappers';
+import type { MemberProject, Project, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 
@@ -74,7 +74,7 @@ export async function getUserProjects(): Promise<Project[]> {
   return mapProjectsRowsToProjects(data);
 }
 
-// a user belongs to a project when they manage it or hold a rate on it
+// a user belongs to a project when they manage it or are one of its members
 export async function getMyProjects(): Promise<MemberProject[]> {
   const supabase = createBrowserClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -90,21 +90,19 @@ export async function getMyProjects(): Promise<MemberProject[]> {
     return [];
   }
 
-  const projects = await fetchVisibleProjects(supabase, userData.user.id);
+  const userId = userData.user.id;
+  const memberships = await supabase.from('project_members').select('project_id').eq('user_id', userId);
 
-  return toMemberProjects(projects, userData.user.id);
-}
+  if (memberships.error) {
+    throw {
+      message: memberships.error.message,
+      statusCode: memberships.status
+    } satisfies ApiError;
+  }
 
-export function toMemberProjects(projects: Project[], userId: string): MemberProject[] {
-  return projects
-    .map((project) => ({ project, membership: project.managerId === userId ? ('manager' as const) : ('member' as const) }))
-    .sort((a, b) => STATUS_ORDER[a.project.status] - STATUS_ORDER[b.project.status] || a.project.name.localeCompare(b.project.name));
-}
-
-// membership pairs without rates, so staff also see who else works on their projects
-export async function getProjectMembers(): Promise<ProjectMember[]> {
-  const supabase = createBrowserClient();
-  const { data, error, status } = await supabase.rpc('get_project_members');
+  const memberProjectIds = [...new Set((memberships.data ?? []).map((membership) => membership.project_id))];
+  const filter = memberProjectIds.length > 0 ? `manager_id.eq.${userId},id.in.(${memberProjectIds.join(',')})` : `manager_id.eq.${userId}`;
+  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).or(filter);
 
   if (error) {
     throw {
@@ -113,13 +111,27 @@ export async function getProjectMembers(): Promise<ProjectMember[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectMemberRows(data);
+  return toMemberProjects(mapProjectsRowsToProjects(data), userId);
+}
+
+export function toMemberProjects(projects: Project[], userId: string): MemberProject[] {
+  return projects
+    .map((project) => ({ project, membership: project.managerId === userId ? ('manager' as const) : ('member' as const) }))
+    .sort((a, b) => STATUS_ORDER[a.project.status] - STATUS_ORDER[b.project.status] || a.project.name.localeCompare(b.project.name));
 }
 
 export async function getProjectRecords(): Promise<ProjectRecord[]> {
-  const [projects, members] = await Promise.all([getProjects(), getProjectMembers()]);
+  const supabase = createBrowserClient();
+  const { data, error, status } = await supabase.from('projects').select(PROJECT_RECORD_COLUMNS);
 
-  return toProjectRecords(projects, members);
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: status
+    } satisfies ApiError;
+  }
+
+  return mapProjectRecordRows(data);
 }
 
 export function useProjectRecords() {

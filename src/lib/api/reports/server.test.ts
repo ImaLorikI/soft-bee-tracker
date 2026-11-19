@@ -39,7 +39,7 @@ describe('getReportSource', () => {
 
   it('throws an ApiError when any read fails', async () => {
     mockTables();
-    mockRpc({ get_project_members: { data: null, error: { message: 'permission denied' }, status: 403 } });
+    mockRpc({ get_project_people: { data: null, error: { message: 'permission denied' }, status: 403 } });
 
     await expect(getReportSource(RANGE)).rejects.toEqual({ message: 'permission denied', statusCode: 403 });
   });
@@ -94,10 +94,6 @@ describe('getReportSource', () => {
 function mockRpc(overrides: Record<string, QueryResult>) {
   const results: Record<string, QueryResult> = {
     get_report_time: ok([{ user_id: 'u3', project_id: 'p1', minutes: 480 }]),
-    get_project_members: ok([
-      { project_id: 'p1', user_id: 'u2' },
-      { project_id: 'p1', user_id: 'u3' }
-    ]),
     get_project_people: ok([
       { id: 'u3', first_name: 'Alex', last_name: 'Smith', role: 'worker', positions: [], is_confirmed: true, is_blocked: false }
     ]),
@@ -115,7 +111,24 @@ function mockTables() {
       Promise.resolve(ok([{ id: 'a1', user_id: 'u3', leave_type: 'vacation', start_date: '2026-11-10', end_date: '2026-11-11' }]))
     )
   };
-  const projectsResult = ok([projectRow]);
+  const projectsResult = ok([
+    {
+      id: 'p1',
+      created_at: '',
+      updated_at: '2026-11-01T00:00:00Z',
+      name: 'Fundayo',
+      client: '',
+      note: null,
+      picture_url: null,
+      start_date: null,
+      end_date: null,
+      status: 'active',
+      type: 'time_material',
+      manager_id: 'u2',
+      links: [],
+      project_members: [{ user_id: 'u2' }, { user_id: 'u3' }]
+    }
+  ]);
 
   from.mockImplementation((table: string) => ({
     select: () => (table === 'leave_requests' ? leaveQuery : Promise.resolve(projectsResult))

@@ -1,0 +1,81 @@
+name: Security checks
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan configs, workflows, lockfile, and lifecycle scripts
+        run: bash scripts/scan-configs.sh
+
+      - name: Scan changed JS/TS files for suspicious patterns
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/scan-changed-files.sh "$BASE_SHA" "$HEAD_SHA"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      # Corepack activates the Yarn version pinned in package.json#packageManager
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies (no lifecycle scripts)
+        env:
+          YARN_ENABLE_HARDENED_MODE: 'true'
+        run: yarn install --immutable --mode=skip-build
+
+      # PRs that don't touch dependencies skip the audit so a newly published
+      # advisory can't fail unrelated PRs; the schedule and pushes still catch it.
+      # A git diff error (exit > 1) falls through to auditing.
+      - name: Check whether dependencies changed
+        id: deps
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && \
+            git diff --quiet "$BASE_SHA"..."$HEAD_SHA" -- package.json yarn.lock .yarnrc.yml .yarn; then
+            echo "audit=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency changes in this PR; skipping audit."
+          else
+            echo "audit=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Audit for high/critical vulnerabilities
+        if: steps.deps.outputs.audit == 'true'
+        run: |
+          echo "Running yarn npm audit for high and critical severity..."
+          if ! yarn npm audit --severity high --recursive 2>&1; then
+            {
+              echo "### ❌ Dependency audit failed"
+              echo ""
+              echo "High or critical vulnerabilities found in dependencies."
+              echo "Run \`yarn npm audit\` locally for details and remediation advice."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "✅ No high/critical vulnerabilities found."

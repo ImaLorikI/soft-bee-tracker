@@ -129,42 +129,68 @@ export type Database = {
           },
         ]
       }
-      project_rates: {
+      project_members: {
         Row: {
           created_at: string
           project_id: string
-          rate: number
-          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           project_id: string
-          rate?: number
-          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           project_id?: string
-          rate?: number
-          updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "project_rates_project_id_fkey"
+            foreignKeyName: "project_members_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "project_rates_user_id_fkey"
+            foreignKeyName: "project_members_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_rates: {
+        Row: {
+          created_at: string
+          project_id: string
+          rate: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          project_id: string
+          rate?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          project_id?: string
+          rate?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_rates_member_fkey"
+            columns: ["project_id", "user_id"]
+            isOneToOne: true
+            referencedRelation: "project_members"
+            referencedColumns: ["project_id", "user_id"]
           },
         ]
       }
@@ -394,13 +420,6 @@ export type Database = {
           responsible_id: string
         }
         Returns: string
-      }
-      get_project_members: {
-        Args: never
-        Returns: {
-          project_id: string
-          user_id: string
-        }[]
       }
       get_project_people: {
         Args: never

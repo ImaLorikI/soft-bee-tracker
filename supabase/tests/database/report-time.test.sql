@@ -13,7 +13,7 @@ update public.user_access set role = 'manager' where user_id = '00000000-0000-00
 insert into public.projects (id, name, manager_id)
 values ('00000000-0000-0000-0000-00000000ec01', 'Report other project', '00000000-0000-0000-0000-00000000e002');
 
-insert into public.project_rates (project_id, user_id)
+insert into public.project_members (project_id, user_id)
 values ('00000000-0000-0000-0000-00000000ec01', '00000000-0000-0000-0000-000000000a03');
 
 insert into public.trackers (date, duration_minutes, status, is_live, live_status, project_id, user_id)
