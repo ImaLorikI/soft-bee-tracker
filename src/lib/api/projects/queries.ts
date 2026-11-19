@@ -3,8 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { getSignedInUserId } from '@/lib/api/auth/queries';
-import { mapProjectMemberRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, toProjectRecords } from '@/lib/api/projects/mappers';
-import type { MemberProject, Project, ProjectMember, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
+import { mapProjectRecordRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, PROJECT_RECORD_COLUMNS } from '@/lib/api/projects/mappers';
+import type { MemberProject, Project, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
 import { createBrowserClient } from '@/lib/supabase/client';
 import type { ApiError } from '@/types/api-error';
 
@@ -19,6 +19,7 @@ export const projectKeys = {
 
 const STATUS_ORDER: Record<ProjectStatus, number> = { active: 0, archived: 1 };
 
+// visibility is projects_select_visible: admin, responsible, or assigned.
 export async function getProjects(): Promise<Project[]> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
@@ -30,7 +31,7 @@ export async function getProjects(): Promise<Project[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectsRowsToProjects(data);
+  return mapProjectsRowsToProjects(data ?? []);
 }
 
 export async function getUserProjects(): Promise<Project[]> {
@@ -53,7 +54,7 @@ export async function getUserProjects(): Promise<Project[]> {
   return mapProjectsRowsToProjects(data);
 }
 
-// a user belongs to a project when they manage it or hold a rate on it
+// a user belongs to a project when they manage it or are one of its members
 export async function getMyProjects(): Promise<MemberProject[]> {
   const supabase = createBrowserClient();
   const userId = await getSignedInUserId();
@@ -62,16 +63,16 @@ export async function getMyProjects(): Promise<MemberProject[]> {
     return [];
   }
 
-  const rates = await supabase.from('project_rates').select('project_id').eq('user_id', userId);
+  const memberships = await supabase.from('project_members').select('project_id').eq('user_id', userId);
 
-  if (rates.error) {
+  if (memberships.error) {
     throw {
-      message: rates.error.message,
-      statusCode: rates.status
+      message: memberships.error.message,
+      statusCode: memberships.status
     } satisfies ApiError;
   }
 
-  const memberProjectIds = [...new Set(rates.data.map((rate) => rate.project_id))];
+  const memberProjectIds = [...new Set((memberships.data ?? []).map((membership) => membership.project_id))];
   const filter = memberProjectIds.length > 0 ? `manager_id.eq.${userId},id.in.(${memberProjectIds.join(',')})` : `manager_id.eq.${userId}`;
   const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS).or(filter);
 
@@ -91,10 +92,10 @@ export function toMemberProjects(projects: Project[], userId: string): MemberPro
     .sort((a, b) => STATUS_ORDER[a.project.status] - STATUS_ORDER[b.project.status] || a.project.name.localeCompare(b.project.name));
 }
 
-// membership pairs without rates, so staff also see who else works on their projects
-export async function getProjectMembers(): Promise<ProjectMember[]> {
+// visibility is projects_select_visible: admin, responsible, or assigned.
+export async function getProjectRecords(): Promise<ProjectRecord[]> {
   const supabase = createBrowserClient();
-  const { data, error, status } = await supabase.rpc('get_project_members');
+  const { data, error, status } = await supabase.from('projects').select(PROJECT_RECORD_COLUMNS);
 
   if (error) {
     throw {
@@ -103,13 +104,7 @@ export async function getProjectMembers(): Promise<ProjectMember[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectMemberRows(data);
-}
-
-export async function getProjectRecords(): Promise<ProjectRecord[]> {
-  const [projects, members] = await Promise.all([getProjects(), getProjectMembers()]);
-
-  return toProjectRecords(projects, members);
+  return mapProjectRecordRows(data ?? []);
 }
 
 export function useProjectRecords() {

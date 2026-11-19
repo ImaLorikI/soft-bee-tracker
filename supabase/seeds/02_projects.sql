@@ -50,11 +50,22 @@ set
   type = excluded.type,
   manager_id = excluded.manager_id;
 
--- assign the seeded worker so tracker creation works under project_rates RLS
-insert into public.project_rates (project_id, user_id, rate)
+-- assign the seeded worker; the membership trigger creates a rate row with rate left null.
+-- internal operations is a deliberate zero; the other two are real hourly rates.
+insert into public.project_members (project_id, user_id)
 values
-  ('00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03', 45.00),
-  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a03', 50.00),
-  ('00000000-0000-0000-0000-000000000b03', '00000000-0000-0000-0000-000000000a03', 0.00)
-on conflict (project_id, user_id) do update
-set rate = excluded.rate;
+  ('00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03'),
+  ('00000000-0000-0000-0000-000000000b02', '00000000-0000-0000-0000-000000000a03'),
+  ('00000000-0000-0000-0000-000000000b03', '00000000-0000-0000-0000-000000000a03')
+on conflict (project_id, user_id) do nothing;
+
+update public.project_rates as pr
+set rate = seeded.rate
+from (
+  values
+    ('00000000-0000-0000-0000-000000000b01'::uuid, '00000000-0000-0000-0000-000000000a03'::uuid, 45.00),
+    ('00000000-0000-0000-0000-000000000b02'::uuid, '00000000-0000-0000-0000-000000000a03'::uuid, 50.00),
+    ('00000000-0000-0000-0000-000000000b03'::uuid, '00000000-0000-0000-0000-000000000a03'::uuid, 0.00)
+) as seeded (project_id, user_id, rate)
+where pr.project_id = seeded.project_id
+  and pr.user_id = seeded.user_id;

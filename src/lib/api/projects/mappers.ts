@@ -1,14 +1,19 @@
-import type { CreateProjectInput, Project, ProjectLink, ProjectMember, ProjectRecord, UpdateProjectInput } from '@/lib/api/projects/types';
+import type { CreateProjectInput, Project, ProjectLink, ProjectRecord, UpdateProjectInput } from '@/lib/api/projects/types';
 import type { Database } from '@/types';
 
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
 type Json = ProjectRow['links'];
 type CreateProjectArgs = Database['public']['Functions']['create_project']['Args'];
 type UpdateProjectRow = Database['public']['Tables']['projects']['Update'];
-type ProjectMemberRow = Database['public']['Functions']['get_project_members']['Returns'][number];
+type ProjectRecordRow = ProjectRow & {
+  project_members: Pick<Database['public']['Tables']['project_members']['Row'], 'user_id'>[];
+};
 
 export const PROJECT_COLUMNS =
   'id, created_at, updated_at, name, client, note, picture_url, start_date, end_date, status, type, manager_id, links';
+
+// one round-trip for the projects page and reports: each project with its member ids
+export const PROJECT_RECORD_COLUMNS = `${PROJECT_COLUMNS}, project_members(user_id)`;
 
 export function mapProjectRowToProject(row: ProjectRow): Project {
   return {
@@ -32,28 +37,22 @@ export function mapProjectsRowsToProjects(rows: ProjectRow[]): Project[] {
   return rows.map(mapProjectRowToProject);
 }
 
-export function mapProjectMemberRows(rows: ProjectMemberRow[]): ProjectMember[] {
-  return rows.map((row) => ({ projectId: row.project_id, userId: row.user_id }));
-}
+export function mapProjectRecordRows(rows: ProjectRecordRow[]): ProjectRecord[] {
+  return rows.map((row) => {
+    const project = mapProjectRowToProject(row);
 
-export function toProjectRecords(projects: Project[], members: ProjectMember[]): ProjectRecord[] {
-  const memberIdsByProject = new Map<string, string[]>();
-
-  for (const member of members) {
-    memberIdsByProject.set(member.projectId, [...(memberIdsByProject.get(member.projectId) ?? []), member.userId]);
-  }
-
-  return projects.map((project) => ({
-    id: project.id,
-    name: project.name,
-    client: project.client,
-    description: project.note ?? '',
-    managerId: project.managerId,
-    status: project.status,
-    memberIds: memberIdsByProject.get(project.id) ?? [],
-    links: project.links,
-    updatedAt: project.updatedAt
-  }));
+    return {
+      id: project.id,
+      name: project.name,
+      client: project.client,
+      description: project.note ?? '',
+      managerId: project.managerId,
+      status: project.status,
+      memberIds: row.project_members.map((member) => member.user_id),
+      links: project.links,
+      updatedAt: project.updatedAt
+    };
+  });
 }
 
 export function mapCreateProjectArgs(project: CreateProjectInput): CreateProjectArgs {

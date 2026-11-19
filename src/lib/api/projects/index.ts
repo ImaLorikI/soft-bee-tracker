@@ -12,7 +12,6 @@ export {
 } from './mutations';
 export {
   getMyProjects,
-  getProjectMembers,
   getProjectRecords,
   getProjects,
   getUserProjects,
@@ -29,7 +28,6 @@ export type {
   MemberProject,
   Project,
   ProjectLink,
-  ProjectMember,
   ProjectMemberInput,
   ProjectMembership,
   ProjectRecord,

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { mapProjectMemberRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, toProjectRecords } from '@/lib/api/projects/mappers';
+import { mapProjectRecordRows, PROJECT_RECORD_COLUMNS } from '@/lib/api/projects/mappers';
 import type { ReportRangeInput, ReportSource } from '@/lib/api/reports/types';
 import { mapProjectPersonRows } from '@/lib/api/users/mappers';
 import { createServerClient } from '@/lib/supabase/server';
@@ -8,18 +8,17 @@ import type { ApiError } from '@/types/api-error';
 
 // imported via '@/lib/api/reports/server' (not the barrel) so client bundles never pull in next/headers.
 // RLS scopes every read to the viewer: projects they see, people they may name, time and leave they may read.
-// Time is summed in the database; the other reads are plain lists and are cut off at the API max_rows (1000)
+// Time is summed in the database; the other reads are plain lists and are cut off at the API max_rows (1000).
 export async function getReportSource({ from, to }: ReportRangeInput): Promise<ReportSource> {
   const supabase = await createServerClient();
-  const [time, leave, projects, members, people] = await Promise.all([
+  const [time, leave, projects, people] = await Promise.all([
     supabase.rpc('get_report_time', { from_date: from, to_date: to }),
     // approved leave that overlaps the range; working days inside it are counted in buildReport
     supabase.from('leave_requests').select(REPORT_LEAVE_COLUMNS).eq('status', 'approved').lte('start_date', to).gte('end_date', from),
-    supabase.from('projects').select(PROJECT_COLUMNS),
-    supabase.rpc('get_project_members'),
+    supabase.from('projects').select(PROJECT_RECORD_COLUMNS),
     supabase.rpc('get_project_people')
   ]);
-  const failed = [time, leave, projects, members, people].find((result) => result.error);
+  const failed = [time, leave, projects, people].find((result) => result.error);
 
   if (failed?.error) {
     throw {
@@ -38,7 +37,7 @@ export async function getReportSource({ from, to }: ReportRangeInput): Promise<R
       endDate: row.end_date
     })),
     people: mapProjectPersonRows(people.data ?? []),
-    projects: toProjectRecords(mapProjectsRowsToProjects(projects.data ?? []), mapProjectMemberRows(members.data ?? []))
+    projects: mapProjectRecordRows(projects.data ?? [])
   };
 }
 
