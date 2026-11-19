@@ -18,6 +18,7 @@ export const projectKeys = {
 
 const STATUS_ORDER: Record<ProjectStatus, number> = { active: 0, archived: 1 };
 
+// visibility is projects_select_visible: admin, responsible, or assigned.
 export async function getProjects(): Promise<Project[]> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
@@ -29,7 +30,7 @@ export async function getProjects(): Promise<Project[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectsRowsToProjects(data);
+  return mapProjectsRowsToProjects(data ?? []);
 }
 
 export async function getUserProjects(): Promise<Project[]> {
@@ -106,6 +107,7 @@ export function toMemberProjects(projects: Project[], userId: string): MemberPro
     .sort((a, b) => STATUS_ORDER[a.project.status] - STATUS_ORDER[b.project.status] || a.project.name.localeCompare(b.project.name));
 }
 
+// visibility is projects_select_visible: admin, responsible, or assigned.
 export async function getProjectRecords(): Promise<ProjectRecord[]> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase.from('projects').select(PROJECT_RECORD_COLUMNS);
@@ -117,7 +119,7 @@ export async function getProjectRecords(): Promise<ProjectRecord[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectRecordRows(data);
+  return mapProjectRecordRows(data ?? []);
 }
 
 export function useProjectRecords() {

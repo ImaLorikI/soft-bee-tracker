@@ -54,6 +54,19 @@ describe('projects requests', () => {
     });
   });
 
+  it('loads the project rows row-level security returns', async () => {
+    const select = vi.fn().mockResolvedValue({ data: [projectRow], error: null, status: 200 });
+    createBrowserClient.mockReturnValue({ from: vi.fn().mockReturnValue({ select }) });
+
+    const projects = await getProjects();
+
+    expect(select).toHaveBeenCalledWith(
+      'id, created_at, updated_at, name, client, note, picture_url, start_date, end_date, status, type, manager_id, links'
+    );
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.managerId).toBe('manager-2');
+  });
+
   it('filters user projects by the authenticated manager id', async () => {
     const equal = vi.fn().mockResolvedValue({ data: [{ ...projectRow, manager_id: 'user-1' }], error: null, status: 200 });
     createBrowserClient.mockReturnValue({
