@@ -17,8 +17,8 @@ import {
   type LeaveRequest,
   type LeaveStatus
 } from '@/lib/api/leave';
-import { formatText } from '@/lib/format-text';
-import { computeLeaveBalances, countLeaveWorkingDays, formatLeaveDateRange, LEAVE_TYPES, type LeaveBalance } from '@/lib/leave-days';
+import { formatText } from '@/lib/format/format-text';
+import { computeLeaveBalances, countLeaveWorkingDays, formatLeaveDateRange, LEAVE_TYPES, type LeaveBalance } from '@/lib/leave/leave-days';
 import type { LeaveRequestFormValues } from '@/lib/schemas/leave-request-form.schema';
 import type { ApiError } from '@/types/api-error';
 import content from '../content.json';

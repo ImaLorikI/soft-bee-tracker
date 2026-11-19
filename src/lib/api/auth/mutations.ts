@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { ROUTES } from '@/constants';
 import { authKeys, fetchSessionProfile } from '@/lib/api/auth/queries';
 import { mapAvatarUpdateToUserRow, mapProfileUpdateToUserRow, mapUserRowToProfile, USER_COLUMNS } from '@/lib/api/auth/mappers';
-import { AVATAR_BUCKET, buildAvatarPath, validateAvatarFile } from '@/lib/avatar';
+import { AVATAR_BUCKET, buildAvatarPath, validateAvatarFile } from '@/lib/avatar/avatar';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { clearSupabaseAuthCookies } from '@/lib/supabase/cookies';
 import { resetClientState } from '@/lib/api/reset-client-state';

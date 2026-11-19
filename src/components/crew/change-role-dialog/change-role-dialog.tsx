@@ -9,7 +9,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/select';
 import type { UserRole } from '@/lib/api/auth';
 import type { CrewMember } from '@/lib/api/crew';
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import content from '../content.json';
 
 export function ChangeRoleDialog({ member, open, isSaving, onOpenChange, onConfirm }: ChangeRoleDialogProps) {

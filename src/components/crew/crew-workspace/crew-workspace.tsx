@@ -38,10 +38,10 @@ import {
   getVisibleMembers,
   summarizeTeamTime,
   type CrewFilters as CrewFiltersValue
-} from '@/lib/crew';
-import { formatText } from '@/lib/format-text';
-import { getLeaveConflicts } from '@/lib/leave-conflicts';
-import { buildTeamReportHref } from '@/lib/team-report-params';
+} from '@/lib/crew/crew';
+import { formatText } from '@/lib/format/format-text';
+import { getLeaveConflicts } from '@/lib/leave/leave-conflicts';
+import { buildTeamReportHref } from '@/lib/reports/team-report-params';
 import content from '../content.json';
 
 export function CrewWorkspace({ viewer }: CrewWorkspaceProps) {

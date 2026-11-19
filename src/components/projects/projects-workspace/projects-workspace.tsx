@@ -27,8 +27,8 @@ import {
 } from '@/lib/api/projects';
 import { toApiError } from '@/lib/api/to-api-error';
 import { useProjectPeople, type ProjectPerson } from '@/lib/api/users';
-import { getFullName } from '@/lib/crew';
-import { formatText } from '@/lib/format-text';
+import { getFullName } from '@/lib/crew/crew';
+import { formatText } from '@/lib/format/format-text';
 import {
   buildProjectHref,
   DEFAULT_PROJECT_FILTERS,
@@ -44,7 +44,7 @@ import {
   type ProjectSubmitOutcome,
   type ProjectUpdateValues,
   type ProjectViewer
-} from '@/lib/projects';
+} from '@/lib/projects/projects';
 import content from '../content.json';
 
 export function ProjectsWorkspace({ viewerId, role }: ProjectsWorkspaceProps) {

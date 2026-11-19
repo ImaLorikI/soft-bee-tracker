@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { emailSchema } from '@/lib/schemas/email.schema';
-import { isValidTimeZone } from '@/lib/time-zones';
+import { isValidTimeZone } from '@/lib/date/time-zones';
 import content from './content.json';
 
 const optionalUrlSchema = z.url(content.profile.invalidUrl).or(z.literal(''));

@@ -44,10 +44,10 @@ import {
   type CrewMember,
   type CrewViewer
 } from '@/lib/api/crew';
-import { canReviewLeaveRequest, computeMemberLeaveBalances, getFullName, getManagerNames, toSafeExternalUrl } from '@/lib/crew';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { countLeaveWorkingDays, formatLeaveDateRange, LEAVE_TYPES, type LeaveBalance } from '@/lib/leave-days';
+import { canReviewLeaveRequest, computeMemberLeaveBalances, getFullName, getManagerNames, toSafeExternalUrl } from '@/lib/crew/crew';
+import { formatClock } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
+import { countLeaveWorkingDays, formatLeaveDateRange, LEAVE_TYPES, type LeaveBalance } from '@/lib/leave/leave-days';
 import type { LeaveRequestFormValues } from '@/lib/schemas/leave-request-form.schema';
 import { getUserAvatarFallback } from '@/lib/utils';
 import type { LeaveType } from '@/lib/api/leave';

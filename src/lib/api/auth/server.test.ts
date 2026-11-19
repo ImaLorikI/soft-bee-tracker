@@ -225,7 +225,7 @@ describe('requireRouteAccess', () => {
     signInAs('worker');
     getUser.mockResolvedValue({ data: { user: null }, error: new AuthApiError('session not found', 403, 'session_not_found') });
 
-    await expect(requireRouteAccess(ROUTES.DASHBOARD)).rejects.toThrow(`NEXT_REDIRECT:${ROUTES.SIGN_OUT}`);
+    await expect(requireRouteAccess(ROUTES.TRACKER)).rejects.toThrow(`NEXT_REDIRECT:${ROUTES.SIGN_OUT}`);
   });
 
   it('signs out a blocked user on a restricted page instead of showing access denied', async () => {

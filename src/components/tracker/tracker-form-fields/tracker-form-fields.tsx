@@ -10,7 +10,7 @@ import { Input } from '@ui/input';
 import type { Project } from '@/lib/api/projects';
 import type { TrackerFormValues } from '@/lib/schemas/tracker-form.schema';
 import type { ApiError } from '@/types/api-error';
-import { getEarliestOpenDateKey } from '@/lib/work-time-policy';
+import { getEarliestOpenDateKey } from '@/lib/tracker/work-time-policy';
 import content from '../content.json';
 
 export function TrackerFormFields({ form, idPrefix, projects, isLoadingProjects, projectsError, isDisabled }: TrackerFormFieldsProps) {

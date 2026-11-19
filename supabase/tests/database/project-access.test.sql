@@ -1,6 +1,6 @@
 begin;
 
-select plan(26);
+select plan(37);
 
 -- seeded: admin a01, manager a02 (responsible for the seeded projects), worker a03.
 -- two more managers are added here.
@@ -28,11 +28,38 @@ select lives_ok(
 );
 
 select is(
-  (select array_agg(user_id order by user_id)::text from public.project_rates
+  (select array_agg(user_id order by user_id)::text from public.project_members
    where project_id = '00000000-0000-0000-0000-00000000fb01'),
   '{00000000-0000-0000-0000-000000000a02,00000000-0000-0000-0000-00000000f002}',
   'the responsible manager and the creating manager are both on the project'
 );
+
+select is(
+  (select count(*)::int from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  1,
+  'a creating manager who is only a member sees only their own rate'
+);
+
+-- responsible manager sees every rate on the project
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f002","role":"authenticated","user_role":"manager"}', true);
+
+select is(
+  (select count(*)::int from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  2,
+  'membership trigger also creates a rate row for each member'
+);
+
+select is(
+  (select bool_and(rate is null) from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  true,
+  'a new membership leaves the rate unset'
+);
+
+-- creating manager continues project edits
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
 
 select is(
   (select manager_id::text from public.projects where id = '00000000-0000-0000-0000-00000000fb01'),
@@ -49,9 +76,82 @@ select is(
 );
 
 select lives_ok(
-  $$insert into public.project_rates (project_id, user_id)
+  $$insert into public.project_members (project_id, user_id)
     values ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-000000000a03')$$,
   'the creating manager can add members'
+);
+
+-- rate visibility and edits: responsible manager only (not a member-only manager)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f002","role":"authenticated","user_role":"manager"}', true);
+
+select is(
+  (select count(*)::int from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  1,
+  'adding a member also creates their rate row'
+);
+
+select throws_ok(
+  $$delete from public.project_rates
+    where project_id = '00000000-0000-0000-0000-00000000fb01'
+      and user_id = '00000000-0000-0000-0000-000000000a03'$$,
+  '42501',
+  null,
+  'rates cannot be deleted directly'
+);
+
+select throws_ok(
+  $$insert into public.project_rates (project_id, user_id, rate)
+    values ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-000000000a03', 10)$$,
+  '42501',
+  null,
+  'rates cannot be inserted directly'
+);
+
+update public.project_rates set rate = 55
+where project_id = '00000000-0000-0000-0000-00000000fb01'
+  and user_id = '00000000-0000-0000-0000-000000000a03';
+
+select is(
+  (select rate from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  55.00::numeric,
+  'the responsible manager can update a member rate'
+);
+
+update public.project_rates set rate = 0
+where project_id = '00000000-0000-0000-0000-00000000fb01'
+  and user_id = '00000000-0000-0000-0000-000000000a03';
+
+select is(
+  (select rate from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  0.00::numeric,
+  'zero is a stored rate, distinct from an unset rate'
+);
+
+select throws_ok(
+  $$update public.project_rates set user_id = '00000000-0000-0000-0000-00000000f003'
+    where project_id = '00000000-0000-0000-0000-00000000fb01'
+      and user_id = '00000000-0000-0000-0000-000000000a03'$$,
+  '42501',
+  null,
+  'a rate row can only change its rate'
+);
+
+-- creating manager resumes membership and project checks
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
+
+select throws_ok(
+  $$update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'
+    where project_id = '00000000-0000-0000-0000-00000000fb01'
+      and user_id = '00000000-0000-0000-0000-000000000a03'$$,
+  '42501',
+  null,
+  'membership cannot be updated'
 );
 
 select throws_ok(
@@ -93,7 +193,7 @@ select public.create_project(
 ) as id;
 
 select is(
-  (select count(*)::int from public.project_rates pr where pr.project_id = (select id from created_project)),
+  (select count(*)::int from public.project_members pm where pm.project_id = (select id from created_project)),
   4,
   'create_project adds the responsible person, the creator and the chosen managers and admins'
 );
@@ -152,7 +252,7 @@ select is(
 update public.projects set note = 'outsider' where id = '00000000-0000-0000-0000-00000000fb01';
 
 select throws_ok(
-  $$insert into public.project_rates (project_id, user_id)
+  $$insert into public.project_members (project_id, user_id)
     values ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-00000000f003')$$,
   '42501',
   null,
@@ -160,9 +260,9 @@ select throws_ok(
 );
 
 select is(
-  (select count(*)::int from public.get_project_members() where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  (select count(*)::int from public.project_members where project_id = '00000000-0000-0000-0000-00000000fb01'),
   0,
-  'membership lookup follows the same visibility'
+  'membership rows follow the same visibility'
 );
 
 -- admin
@@ -181,19 +281,34 @@ select lives_ok(
 );
 
 select is(
-  (select count(*)::int from public.project_rates where project_id = '00000000-0000-0000-0000-00000000fb02'),
+  (select count(*)::int from public.project_members where project_id = '00000000-0000-0000-0000-00000000fb02'),
   1,
   'an admin who creates a project for someone else is not added to it'
 );
 
-delete from public.project_rates
+delete from public.project_members
 where project_id = '00000000-0000-0000-0000-00000000fb02'
   and user_id = '00000000-0000-0000-0000-00000000f003';
 
 select is(
-  (select count(*)::int from public.project_rates where project_id = '00000000-0000-0000-0000-00000000fb02'),
+  (select count(*)::int from public.project_members where project_id = '00000000-0000-0000-0000-00000000fb02'),
   1,
   'the responsible person cannot be removed from the project'
+);
+
+insert into public.project_members (project_id, user_id)
+values ('00000000-0000-0000-0000-00000000fb02', '00000000-0000-0000-0000-000000000a03');
+
+delete from public.project_members
+where project_id = '00000000-0000-0000-0000-00000000fb02'
+  and user_id = '00000000-0000-0000-0000-000000000a03';
+
+select is(
+  (select count(*)::int from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb02'
+     and user_id = '00000000-0000-0000-0000-000000000a03'),
+  0,
+  'removing a member also removes their rate'
 );
 
 select is((select count(*)::int from public.projects), (select total from project_totals), 'an admin sees every project');
@@ -210,7 +325,7 @@ select is(
 );
 
 select throws_ok(
-  $$insert into public.project_rates (project_id, user_id)
+  $$insert into public.project_members (project_id, user_id)
     values ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-00000000f003')$$,
   '42501',
   null,

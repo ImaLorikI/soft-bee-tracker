@@ -8,7 +8,7 @@ import type { UserRole } from '@/lib/api/auth/types';
 import { getRouteSession, resolveSessionProfile } from '@/lib/api/auth/server';
 import { canInviteRole, getInvitableRoles } from '@/lib/api/invites/permissions';
 import type { InviteMemberInput, InviteMemberResult } from '@/lib/api/invites/types';
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import { inviteMemberFormSchema } from '@/lib/schemas/invite-member-form.schema';
 import { createServiceClient } from '@/lib/supabase/server';
 import content from './content.json';

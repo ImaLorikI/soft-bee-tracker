@@ -3,10 +3,10 @@ import { ChartColumnIcon } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@ui/button';
-import type { TeamTimeSummary } from '@/lib/crew';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { getPeriodRange } from '@/lib/tracker-summary';
+import type { TeamTimeSummary } from '@/lib/crew/crew';
+import { formatClock } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
+import { getPeriodRange } from '@/lib/tracker/tracker-summary';
 import content from '../content.json';
 
 export function TeamSummary({ summary, peopleCount, today, reportHref }: TeamSummaryProps) {

@@ -1,7 +1,7 @@
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { ROUTES } from '@/constants';
+import { HOME_ROUTE, ROUTES } from '@/constants';
 import { createServerClient } from '@/lib/supabase/server';
 
 const EMAIL_OTP_TYPES: readonly EmailOtpType[] = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'];
@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get('token_hash');
   const type = parseEmailOtpType(searchParams.get('type'));
   const code = searchParams.get('code');
-  const nextParam = searchParams.get('next') ?? ROUTES.DASHBOARD;
+  const nextParam = searchParams.get('next') ?? HOME_ROUTE;
 
   const redirectTo = request.nextUrl.clone();
   // only allow internal paths to prevent open redirects via crafted links
-  redirectTo.pathname = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : ROUTES.DASHBOARD;
+  redirectTo.pathname = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : HOME_ROUTE;
   redirectTo.search = '';
 
   const supabase = await createServerClient();

@@ -1,4 +1,4 @@
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import content from './content.json';
 
 export function formatDayCount(count: number): string {

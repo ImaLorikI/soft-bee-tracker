@@ -6,12 +6,12 @@ import { PencilIcon, PlayIcon, Trash2Icon } from 'lucide-react';
 import { Badge } from '@ui/badge';
 import { Button } from '@ui/button';
 import type { Tracker, TrackerStatus } from '@/lib/api/trackers';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { isLiveTrackerActive } from '@/lib/live-tracker';
-import { getTrackerMinutes } from '@/lib/tracker-days';
-import { isEntryDateOpen } from '@/lib/work-time-policy';
+import { formatClock } from '@/lib/format/format-duration';
+import { isLiveTrackerActive } from '@/lib/tracker/live-tracker';
+import { getTrackerMinutes } from '@/lib/tracker/tracker-days';
+import { isEntryDateOpen } from '@/lib/tracker/work-time-policy';
 import content from '../content.json';
+import { formatText } from '@/lib/format/format-text';
 
 export function TrackerEntryRow({
   tracker,

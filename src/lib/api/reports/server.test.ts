@@ -37,7 +37,7 @@ describe('getReportSource', () => {
 
   it('throws an ApiError when any read fails', async () => {
     mockTables();
-    mockRpc({ get_project_members: { data: null, error: { message: 'permission denied' }, status: 403 } });
+    mockRpc({ get_project_people: { data: null, error: { message: 'permission denied' }, status: 403 } });
 
     await expect(getReportSource(RANGE)).rejects.toEqual({ message: 'permission denied', statusCode: 403 });
   });
@@ -46,10 +46,6 @@ describe('getReportSource', () => {
 function mockRpc(overrides: Record<string, QueryResult>) {
   const results: Record<string, QueryResult> = {
     get_report_time: ok([{ user_id: 'u3', project_id: 'p1', minutes: 480 }]),
-    get_project_members: ok([
-      { project_id: 'p1', user_id: 'u2' },
-      { project_id: 'p1', user_id: 'u3' }
-    ]),
     get_project_people: ok([
       { id: 'u3', first_name: 'Alex', last_name: 'Smith', role: 'worker', positions: [], is_confirmed: true, is_blocked: false }
     ]),
@@ -81,7 +77,8 @@ function mockTables() {
       status: 'active',
       type: 'time_material',
       manager_id: 'u2',
-      links: []
+      links: [],
+      project_members: [{ user_id: 'u2' }, { user_id: 'u3' }]
     }
   ]);
 

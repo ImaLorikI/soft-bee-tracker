@@ -6,8 +6,8 @@ import { ReportsWorkspace } from '@components/reports/reports-workspace/reports-
 import { ROUTES } from '@/constants';
 import { requireRouteAccess } from '@/lib/api/auth/server';
 import { getReportSource } from '@/lib/api/reports/server';
-import { buildReport, getReportOptions, getTodayKey, parseReportFilters, type ReportSearchParams } from '@/lib/reports';
-import { COMPANY_TIME_ZONE } from '@/lib/work-time-policy';
+import { buildReport, getReportOptions, getTodayKey, parseReportFilters, type ReportSearchParams } from '@/lib/reports/reports';
+import { COMPANY_TIME_ZONE } from '@/lib/tracker/work-time-policy';
 import content from './content.json';
 
 // The report is built on the server and scoped to the viewer (RLS plus getReportScope) before anything reaches the browser

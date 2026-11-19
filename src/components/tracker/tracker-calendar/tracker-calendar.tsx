@@ -18,9 +18,9 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { Button } from '@ui/button';
 import { Skeleton } from '@ui/skeleton';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { DAILY_NORM_MINUTES, toDateKey } from '@/lib/tracker-days';
+import { formatClock } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
+import { DAILY_NORM_MINUTES, toDateKey } from '@/lib/tracker/tracker-days';
 import { cn } from '@/lib/utils';
 import content from '../content.json';
 

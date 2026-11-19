@@ -8,9 +8,9 @@ import type { DateRange } from 'react-day-picker';
 import { Button } from '@ui/button';
 import { Calendar } from '@ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@ui/popover';
-import { findPeriodPreset, formatPeriodShort, resolvePeriodPreset, type ReportRange } from '@/lib/reports';
-import { REPORT_PERIODS, type ReportPeriod } from '@/lib/team-report-params';
-import { toDateKey } from '@/lib/tracker-days';
+import { findPeriodPreset, formatPeriodShort, resolvePeriodPreset, type ReportRange } from '@/lib/reports/reports';
+import { REPORT_PERIODS, type ReportPeriod } from '@/lib/reports/team-report-params';
+import { toDateKey } from '@/lib/tracker/tracker-days';
 import { cn } from '@/lib/utils';
 import content from '../content.json';
 

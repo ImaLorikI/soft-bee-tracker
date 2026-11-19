@@ -6,7 +6,7 @@ import { MemberProfile } from '@components/crew/member-profile/member-profile';
 import { ROUTES } from '@/constants';
 import { requireRouteAccess } from '@/lib/api/auth/server';
 import { canViewCrewMember } from '@/lib/api/crew/server';
-import { getCrewPermissions } from '@/lib/crew';
+import { getCrewPermissions } from '@/lib/crew/crew';
 import content from './content.json';
 
 export default async function MemberProfilePage({ params }: MemberProfilePageProps) {

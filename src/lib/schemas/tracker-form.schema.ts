@@ -2,9 +2,9 @@ import { format } from 'date-fns';
 import { z } from 'zod';
 
 import type { CreateTrackerInput, Tracker } from '@/lib/api/trackers';
-import { MAX_DURATION_MINUTES } from '@/lib/format-duration';
-import { clampFinishedMinutes, getLiveElapsedMinutes } from '@/lib/live-tracker';
-import { isEntryDateOpen } from '@/lib/work-time-policy';
+import { MAX_DURATION_MINUTES } from '@/lib/format/format-duration';
+import { clampFinishedMinutes, getLiveElapsedMinutes } from '@/lib/tracker/live-tracker';
+import { isEntryDateOpen } from '@/lib/tracker/work-time-policy';
 import content from './content.json';
 
 export const trackerFormSchema = z.object({

@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { getMsUntilNextLiveMinute } from '@/lib/live-tracker';
+import { getMsUntilNextLiveMinute } from '@/lib/tracker/live-tracker';
 
 export function useLiveMinuteNow(startLiveDate: string | null): Date {
   const [now, setNow] = React.useState(() => new Date());

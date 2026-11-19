@@ -1,4 +1,4 @@
-import { parseDescription } from '@/lib/projects';
+import { parseDescription } from '@/lib/projects/projects';
 import { cn } from '@/lib/utils';
 
 // Rendered from parsed blocks as plain text nodes, never as HTML

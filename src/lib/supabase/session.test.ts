@@ -46,9 +46,9 @@ describe('updateSession', () => {
   it('treats a claims error as signed out', async () => {
     getClaims.mockResolvedValue({ data: null, error: new Error('invalid jwt') });
 
-    const response = await updateSession(buildRequest(ROUTES.DASHBOARD));
+    const response = await updateSession(buildRequest(ROUTES.TRACKER));
 
-    expect(response.headers.get('location')).toBe(`http://localhost:3000${ROUTES.LOGIN}?next=%2Fdashboard`);
+    expect(response.headers.get('location')).toBe(`http://localhost:3000${ROUTES.LOGIN}?next=%2Ftracker`);
   });
 
   it('lets signed-out users open public routes', async () => {
@@ -60,7 +60,7 @@ describe('updateSession', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
-  it('sends signed-in users from login to the dashboard', async () => {
+  it('sends signed-in users from login to the home route', async () => {
     signedInAs('worker');
 
     const response = await updateSession(buildRequest(ROUTES.LOGIN));

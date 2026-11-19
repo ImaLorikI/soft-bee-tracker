@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getSignedInUserId } from '@/lib/api/auth/queries';
 import {
   mapTrackerReviewRowToTrackerReview,
   mapTrackerRowToTracker,
@@ -52,20 +53,27 @@ export function useProjectTrackers(input: ProjectTrackersInput) {
 
 export async function getTrackers(): Promise<Tracker[]> {
   const supabase = createBrowserClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = await getSignedInUserId();
 
-  if (userError) {
-    throw {
-      message: userError.message,
-      statusCode: userError.status ?? 401
-    } satisfies ApiError;
-  }
-
-  if (!userData.user) {
+  if (!userId) {
     return [];
   }
 
-  return fetchUserTrackers({ userId: userData.user.id });
+  const { data, error, status } = await supabase
+    .from('trackers')
+    .select(TRACKER_COLUMNS)
+    .eq('user_id', userId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: status
+    } satisfies ApiError;
+  }
+
+  return mapTrackersRowsToTrackers(data);
 }
 
 export function useTrackers() {
@@ -77,23 +85,16 @@ export function useTrackers() {
 
 export async function getActiveLiveTracker(): Promise<Tracker | null> {
   const supabase = createBrowserClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = await getSignedInUserId();
 
-  if (userError) {
-    throw {
-      message: userError.message,
-      statusCode: userError.status ?? 401
-    } satisfies ApiError;
-  }
-
-  if (!userData.user) {
+  if (!userId) {
     return null;
   }
 
   const { data, error, status } = await supabase
     .from('trackers')
     .select(TRACKER_COLUMNS)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', userId)
     .eq('is_live', true)
     .in('live_status', ['start', 'pause'])
     .order('created_at', { ascending: false })

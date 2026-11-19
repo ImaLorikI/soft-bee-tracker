@@ -6,7 +6,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import { Input } from '@ui/input';
 import { cn } from '@/lib/utils';
-import { formatHoursMinutes, MAX_DURATION_MINUTES, parseHoursMinutes } from '@/lib/format-duration';
+import { formatHoursMinutes, MAX_DURATION_MINUTES, parseHoursMinutes } from '@/lib/format/format-duration';
 import content from '../content.json';
 
 export function DurationPicker({ id, value, onChange, isDisabled = false, isInvalid = false }: DurationPickerProps) {

@@ -303,7 +303,7 @@ When you change a shared rule, update every instruction file that states it so t
 | `/auth/sign-out` | Clears a broken, revoked or blocked session | Public |
 | `/access-denied`, `/blocked` | Shown when a role can't open a page, or the account is blocked | Public |
 | `/terms` | Terms of use | Public |
-| `/`, `/dashboard` | Redirect to `/tracker` | Any signed-in role |
+| `/` | Redirect to `/tracker` | Any signed-in role |
 | `/tracker` | Time tracking | Any signed-in role |
 | `/projects` | Projects (read-only for workers, enforced by RLS) | Any signed-in role |
 | `/profile` | User profile settings | Any signed-in role |

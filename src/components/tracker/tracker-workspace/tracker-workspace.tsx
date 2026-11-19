@@ -11,10 +11,10 @@ import { TRACKER_GRID_CLASS, TrackerWorkspaceSkeleton } from '@components/tracke
 import { useLiveMinuteNow } from '@/hooks/use-live-minute-now';
 import { useMyLeaveAllowances, useMyLeaveRequests } from '@/lib/api/leave';
 import { useTrackers } from '@/lib/api/trackers';
-import { getApprovedLeaveByDate } from '@/lib/leave-days';
-import { isLiveTrackerActive } from '@/lib/live-tracker';
-import { sumMinutesByDate, toDateKey } from '@/lib/tracker-days';
-import type { SummaryPeriod } from '@/lib/tracker-summary';
+import { getApprovedLeaveByDate } from '@/lib/leave/leave-days';
+import { isLiveTrackerActive } from '@/lib/tracker/live-tracker';
+import { sumMinutesByDate, toDateKey } from '@/lib/tracker/tracker-days';
+import type { SummaryPeriod } from '@/lib/tracker/tracker-summary';
 
 export function TrackerWorkspace({ header }: TrackerWorkspaceProps) {
   const isClient = useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot);

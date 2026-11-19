@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { UserRole } from '@/lib/api/auth';
 import type { ProjectRecord, ProjectStatus } from '@/lib/api/projects';
 import type { ProjectPerson } from '@/lib/api/users';
-import { formatText } from '@/lib/format-text';
-import { buildProjectHref, filterProjects, getDescriptionSummary, getShortName, type ProjectFilters } from '@/lib/projects';
+import { formatText } from '@/lib/format/format-text';
+import { buildProjectHref, filterProjects, getDescriptionSummary, getShortName, type ProjectFilters } from '@/lib/projects/projects';
 import { cn } from '@/lib/utils';
 import content from '../content.json';
 

@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import { leaveAllowanceFormSchema, type LeaveAllowanceFormValues } from '@/lib/schemas/leave-allowance-form.schema';
 import content from '../content.json';
 
