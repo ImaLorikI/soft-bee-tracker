@@ -279,7 +279,7 @@ describe('tracker review mutations', () => {
     });
 
     await expect(approveTracker('tracker-1')).rejects.toEqual({
-      message: 'Your action was cancelled because this entry was deleted or changed by someone else.',
+      message: 'Your action was cancelled because the status was changed by someone else or this entry was deleted.',
       statusCode: 406,
       code: 'tracker_review.status_changed'
     });
@@ -311,6 +311,20 @@ describe('tracker write errors', () => {
     mockTrackersTable({ data: null, error: lockedError, status: 400 });
 
     await expect(deleteTracker({ ...runningTracker, status: 'approved' })).rejects.toEqual({ message: lockedMessage, statusCode: 400 });
+  });
+
+  it('cancels delete when the status no longer matches what the ui showed', async () => {
+    const { builder } = mockTrackersTable({ data: null, error: null, status: 200 });
+
+    await expect(deleteTracker(runningTracker)).rejects.toEqual({
+      message: 'Your action was cancelled because the status was changed by someone else or this entry was deleted.',
+      statusCode: 200,
+      code: 'tracker_review.status_changed'
+    });
+
+    expect(builder.eq).toHaveBeenCalledWith('id', runningTracker.id);
+    expect(builder.eq).toHaveBeenCalledWith('status', 'new');
+    expect(builder.select).toHaveBeenCalledWith('id');
   });
 
   it('explains an entry logged as already reviewed', async () => {

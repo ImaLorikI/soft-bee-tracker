@@ -14,6 +14,7 @@ import {
   mapTrackerWriteErrorToApiError,
   mapTrackerRowToTracker,
   TRACKER_COLUMNS,
+  TRACKER_STATUS_CHANGED_CODE,
   type UpdateTrackerRow
 } from '@/lib/api/trackers/mappers';
 import { trackerKeys } from '@/lib/api/trackers/queries';
@@ -141,12 +142,22 @@ export function updateTracker({ trackerId, entry }: UpdateTrackerInput): Promise
   return updateTrackerRow(trackerId, mapCreateTrackerInputToRow(entry));
 }
 
+// only delete while status still matches what the ui showed. a concurrent review (or rls
+// hiding a non-new row) returns no rows — same cancelled warning as approve/reject races
 export async function deleteTracker(tracker: Tracker): Promise<Tracker> {
   const supabase = createBrowserClient();
-  const { error, status } = await supabase.from('trackers').delete().eq('id', tracker.id);
+  const { data, error, status } = await supabase.from('trackers').delete().eq('id', tracker.id).eq('status', tracker.status).select('id');
 
   if (error) {
     throw mapTrackerWriteErrorToApiError(error, status);
+  }
+
+  if (!data?.length) {
+    throw {
+      message: content.reviewErrors.statusChanged,
+      statusCode: status || 409,
+      code: TRACKER_STATUS_CHANGED_CODE
+    } satisfies ApiError;
   }
 
   return tracker;

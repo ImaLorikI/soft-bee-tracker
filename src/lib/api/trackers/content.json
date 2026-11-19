@@ -19,7 +19,7 @@
     "reasonTooLong": "The reason can be at most 500 characters.",
     "timerRunning": "This timer is still running and can't be reviewed yet.",
     "alreadyReviewed": "This entry was already reviewed. Refresh to see the latest decision.",
-    "statusChanged": "Your action was cancelled because this entry was deleted or changed by someone else.",
+    "statusChanged": "Your action was cancelled because the status was changed by someone else or this entry was deleted.",
     "reviewedLocked": "This entry was already reviewed. Ask a manager to undo the review before changing or deleting it.",
     "unexpected": "Couldn't update the review. Try again.",
     "insertReviewed": "New time entries are saved unreviewed. Save it first, then approve it."
