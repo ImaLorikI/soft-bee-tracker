@@ -16,13 +16,13 @@ import { Skeleton } from '@ui/skeleton';
 import { useProjects } from '@/lib/api/projects';
 import { useActiveLiveTracker, useDeleteTracker, useRestartLiveTracker } from '@/lib/api/trackers';
 import type { Tracker } from '@/lib/api/trackers';
-import { formatClock, formatDuration } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { getWeekDays, toDateKey } from '@/lib/tracker-days';
+import { formatClock, formatDuration } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
+import { getWeekDays, toDateKey } from '@/lib/tracker/tracker-days';
 import { cn } from '@/lib/utils';
 import type { LeaveType } from '@/lib/api/leave';
 import type { ApiError } from '@/types/api-error';
-import { isEntryDateOpen } from '@/lib/work-time-policy';
+import { isEntryDateOpen } from '@/lib/tracker/work-time-policy';
 import content from '../content.json';
 
 export function DayEntries({

@@ -1,7 +1,7 @@
 'use client';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/select';
-import { getFullName } from '@/lib/crew';
+import { getFullName } from '@/lib/crew/crew';
 import type { ProjectPerson } from '@/lib/api/users';
 
 export function ManagerSelect({ id, value, candidates, placeholder, isDisabled, isInvalid, onChange }: ManagerSelectProps) {

@@ -8,7 +8,7 @@ import { ChangePasswordDialog } from '@components/profile/change-password-dialog
 import { ChangePhotoDialog } from '@components/profile/change-photo-dialog/change-photo-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@ui/avatar';
 import type { UserProfile } from '@/lib/api/auth';
-import { getProfileDisplayName, getProfilePosition, getProfileStatus } from '@/lib/profile';
+import { getProfileDisplayName, getProfilePosition, getProfileStatus } from '@/lib/profile/profile';
 import { getUserAvatarFallback } from '@/lib/utils';
 import content from '../content.json';
 

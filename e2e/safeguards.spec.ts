@@ -35,12 +35,12 @@ test.describe('Frontend and environment safeguards (E2E)', () => {
     expect(blockedRequests).toEqual([]);
   });
 
-  test('redirects unauthenticated users from protected dashboard to login', async ({ page }) => {
+  test('redirects unauthenticated users from a protected page to login', async ({ page }) => {
     const blockedRequests = await blockNonLocalRequests(page);
 
-    await page.goto('/dashboard');
+    await page.goto('/tracker');
     // the requested page rides along in ?next= so login can return to it
-    await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+    await expect(page).toHaveURL(/\/login\?next=%2Ftracker$/);
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 
     expect(blockedRequests).toEqual([]);

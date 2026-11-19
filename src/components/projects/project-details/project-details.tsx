@@ -14,9 +14,9 @@ import { Skeleton } from '@ui/skeleton';
 import type { ProjectLink, ProjectRecord, ProjectStatus } from '@/lib/api/projects';
 import { useProjectTrackers } from '@/lib/api/trackers';
 import type { ProjectPerson } from '@/lib/api/users';
-import { toSafeExternalUrl } from '@/lib/crew';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
+import { toSafeExternalUrl } from '@/lib/crew/crew';
+import { formatClock } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
 import {
   buildProjectHref,
   getAddableMembers,
@@ -24,9 +24,9 @@ import {
   summarizeProjectTime,
   type ProjectAccess,
   type ProjectViewer
-} from '@/lib/projects';
-import { buildTeamReportHref } from '@/lib/team-report-params';
-import { getPeriodRange } from '@/lib/tracker-summary';
+} from '@/lib/projects/projects';
+import { buildTeamReportHref } from '@/lib/reports/team-report-params';
+import { getPeriodRange } from '@/lib/tracker/tracker-summary';
 import content from '../content.json';
 
 export function ProjectDetails({

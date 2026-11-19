@@ -2,8 +2,8 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/select';
 import type { ProjectPerson } from '@/lib/api/users';
-import { getFullName } from '@/lib/crew';
-import { formatText } from '@/lib/format-text';
+import { getFullName } from '@/lib/crew/crew';
+import { formatText } from '@/lib/format/format-text';
 import content from './content.json';
 
 export function ProjectManagersSelect({ id, value, candidates, isInvalid, onChange }: ProjectManagersSelectProps) {

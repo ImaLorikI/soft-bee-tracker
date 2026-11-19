@@ -33,6 +33,23 @@ export async function fetchSessionProfile(): Promise<UserProfile | null> {
   return mapUserRowToProfile(data);
 }
 
+// reads the id from the local session instead of asking the Auth server like
+// getUser() does: callers only narrow queries to the user's own rows, and RLS
+// still authorizes every request from the JWT
+export async function getSignedInUserId(): Promise<string | null> {
+  const supabase = createBrowserClient();
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: error.status ?? 401
+    } satisfies ApiError;
+  }
+
+  return data.session?.user.id ?? null;
+}
+
 export function useSessionProfile() {
   return useQuery({
     queryKey: authKeys.sessionProfile(),

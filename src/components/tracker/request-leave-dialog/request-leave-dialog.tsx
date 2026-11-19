@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldError, FieldGroup, FieldLabel } from '@ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/select';
 import { Textarea } from '@ui/textarea';
-import { formatText } from '@/lib/format-text';
-import { countLeaveWorkingDays, LEAVE_TYPES } from '@/lib/leave-days';
+import { formatText } from '@/lib/format/format-text';
+import { countLeaveWorkingDays, LEAVE_TYPES } from '@/lib/leave/leave-days';
 import {
   createLeaveRequestFormDefaults,
   leaveRequestFormSchema,

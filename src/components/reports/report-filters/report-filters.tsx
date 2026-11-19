@@ -8,8 +8,8 @@ import { Button } from '@ui/button';
 import { Checkbox } from '@ui/checkbox';
 import { Field, FieldError, FieldLabel } from '@ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/select';
-import { formatText } from '@/lib/format-text';
-import type { ReportExportFormat } from '@/lib/report-export';
+import { formatText } from '@/lib/format/format-text';
+import type { ReportExportFormat } from '@/lib/reports/report-export';
 import {
   getDefaultFilters,
   isSameFilters,
@@ -18,7 +18,7 @@ import {
   type ReportOption,
   type ReportOptions,
   type ReportRange
-} from '@/lib/reports';
+} from '@/lib/reports/reports';
 import content from '../content.json';
 
 export function ReportFilters({ applied, options, labels, todayKey, isPending, onApply, onReset, onExport }: ReportFiltersProps) {

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getSignedInUserId } from '@/lib/api/auth/queries';
 import {
   LEAVE_ALLOWANCE_COLUMNS,
   LEAVE_REQUEST_COLUMNS,
@@ -11,7 +12,6 @@ import {
 } from '@/lib/api/leave/mappers';
 import type { LeaveAllowance, LeaveRequest } from '@/lib/api/leave/types';
 import { createBrowserClient } from '@/lib/supabase/client';
-import type { ApiError } from '@/types/api-error';
 
 export const leaveKeys = {
   all: ['leave'] as const,
@@ -70,18 +70,4 @@ export function useMyLeaveAllowances() {
     queryKey: leaveKeys.myAllowances(),
     queryFn: getMyLeaveAllowances
   });
-}
-
-async function getSignedInUserId(): Promise<string | null> {
-  const supabase = createBrowserClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error) {
-    throw {
-      message: error.message,
-      statusCode: error.status ?? 401
-    } satisfies ApiError;
-  }
-
-  return data.user?.id ?? null;
 }

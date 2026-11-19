@@ -9,7 +9,7 @@ import { useController, useForm } from 'react-hook-form';
 import { StagedDatePicker } from '@components/common/form/staged-date-picker';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
-import { formatText } from '@/lib/format-text';
+import { formatText } from '@/lib/format/format-text';
 import {
   memberEmploymentDateFormSchema,
   memberPositionFormSchema,

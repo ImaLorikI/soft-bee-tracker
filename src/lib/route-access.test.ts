@@ -11,12 +11,11 @@ import {
   type RouteAccess
 } from '@/lib/route-access';
 
-const APP_ROUTES = [ROUTES.DASHBOARD, ROUTES.TRACKER, ROUTES.PROFILE, ROUTES.PROJECTS, ROUTES.CREW, ROUTES.REPORTS];
+const APP_ROUTES = [ROUTES.TRACKER, ROUTES.PROFILE, ROUTES.PROJECTS, ROUTES.CREW, ROUTES.REPORTS];
 
 // the agreed matrix (SBT-49); a change here must be a deliberate product decision
 const EXPECTED_ACCESS: Record<UserRole, Record<string, RouteAccess>> = {
   worker: {
-    [ROUTES.DASHBOARD]: 'allowed',
     [ROUTES.TRACKER]: 'allowed',
     [ROUTES.PROFILE]: 'allowed',
     [ROUTES.PROJECTS]: 'allowed',
@@ -25,7 +24,6 @@ const EXPECTED_ACCESS: Record<UserRole, Record<string, RouteAccess>> = {
     [ROUTES.REPORTS]: 'allowed'
   },
   manager: {
-    [ROUTES.DASHBOARD]: 'allowed',
     [ROUTES.TRACKER]: 'allowed',
     [ROUTES.PROFILE]: 'allowed',
     [ROUTES.PROJECTS]: 'allowed',
@@ -33,7 +31,6 @@ const EXPECTED_ACCESS: Record<UserRole, Record<string, RouteAccess>> = {
     [ROUTES.REPORTS]: 'allowed'
   },
   admin: {
-    [ROUTES.DASHBOARD]: 'allowed',
     [ROUTES.TRACKER]: 'allowed',
     [ROUTES.PROFILE]: 'allowed',
     [ROUTES.PROJECTS]: 'allowed',
@@ -57,7 +54,6 @@ const ROUTE_CLASSIFICATION: Record<keyof typeof ROUTES, 'public' | readonly User
   ACCESS_DENIED: 'public',
   BLOCKED: 'public',
   TERMS: 'public',
-  DASHBOARD: ALL_ROLES,
   PROJECTS: ALL_ROLES,
   TRACKER: ALL_ROLES,
   PROFILE: ALL_ROLES,

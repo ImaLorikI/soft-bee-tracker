@@ -2,10 +2,10 @@ import { format, parseISO } from 'date-fns';
 import { TriangleAlertIcon, UsersIcon } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@ui/alert';
-import { getFullName } from '@/lib/crew';
-import { formatText } from '@/lib/format-text';
-import type { LeaveConflict } from '@/lib/leave-conflicts';
-import { formatLeaveDateRange } from '@/lib/leave-days';
+import { getFullName } from '@/lib/crew/crew';
+import { formatText } from '@/lib/format/format-text';
+import type { LeaveConflict } from '@/lib/leave/leave-conflicts';
+import { formatLeaveDateRange } from '@/lib/leave/leave-days';
 import type { CrewMember } from '@/lib/api/crew';
 import content from '../content.json';
 

@@ -3,11 +3,11 @@ import { ChartColumnIcon, RotateCcwIcon } from 'lucide-react';
 import { EmptyState } from '@components/common/empty-state/empty-state';
 import { Button } from '@ui/button';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@ui/table';
-import { formatClock } from '@/lib/format-duration';
-import { formatText } from '@/lib/format-text';
-import { formatDays } from '@/lib/report-export';
-import { COMPANY_TIME_ZONE_LABEL } from '@/lib/work-time-policy';
-import { formatPeriodHeading, type Report, type ReportAbsenceSummary, type ReportRow } from '@/lib/reports';
+import { formatClock } from '@/lib/format/format-duration';
+import { formatText } from '@/lib/format/format-text';
+import { formatDays } from '@/lib/reports/report-export';
+import { COMPANY_TIME_ZONE_LABEL } from '@/lib/tracker/work-time-policy';
+import { formatPeriodHeading, type Report, type ReportAbsenceSummary, type ReportRow } from '@/lib/reports/reports';
 import content from '../content.json';
 
 export function ReportResults({ report, canReset, onReset }: ReportResultsProps) {

@@ -7,8 +7,8 @@ import { useState } from 'react';
 import { Button } from '@ui/button';
 import { Calendar } from '@ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@ui/popover';
-import { formatText } from '@/lib/format-text';
-import { getYearPage, getYearPageStart, isMonthAfter, YEARS_PER_PAGE } from '@/lib/staged-date';
+import { formatText } from '@/lib/format/format-text';
+import { getYearPage, getYearPageStart, isMonthAfter, YEARS_PER_PAGE } from '@/lib/date/staged-date';
 import { cn } from '@/lib/utils';
 import content from '../content.json';
 

@@ -7,8 +7,14 @@ import { Skeleton } from '@ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@ui/tabs';
 import { useProjects } from '@/lib/api/projects';
 import type { Tracker } from '@/lib/api/trackers';
-import { formatClock } from '@/lib/format-duration';
-import { getPeriodRange, isDateKeyInRange, summarizeTrackersByProject, type DateKeyRange, type SummaryPeriod } from '@/lib/tracker-summary';
+import { formatClock } from '@/lib/format/format-duration';
+import {
+  getPeriodRange,
+  isDateKeyInRange,
+  summarizeTrackersByProject,
+  type DateKeyRange,
+  type SummaryPeriod
+} from '@/lib/tracker/tracker-summary';
 import type { LeaveType } from '@/lib/api/leave';
 import type { ApiError } from '@/types/api-error';
 import content from '../content.json';

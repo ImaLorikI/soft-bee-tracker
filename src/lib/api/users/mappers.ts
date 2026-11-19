@@ -1,6 +1,6 @@
 import { parseUserPositions } from '@/lib/api/auth/mappers';
 import type { ProjectPerson } from '@/lib/api/users/types';
-import { getProfilePosition, getProfileStatus } from '@/lib/profile';
+import { getProfilePosition, getProfileStatus } from '@/lib/profile/profile';
 import type { Database } from '@/types';
 
 type ProjectPersonRow = Database['public']['Functions']['get_project_people']['Returns'][number];

@@ -71,7 +71,7 @@ describe('projects requests', () => {
     const equal = vi.fn().mockResolvedValue({ data: [{ ...projectRow, manager_id: 'user-1' }], error: null, status: 200 });
     createBrowserClient.mockReturnValue({
       auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null })
+        getSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null })
       },
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({ eq: equal })
