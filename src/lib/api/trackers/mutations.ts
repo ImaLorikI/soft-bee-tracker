@@ -175,7 +175,8 @@ export function rejectTracker({ trackerId, note }: TrackerReviewNoteInput): Prom
   return updateTrackerReview(trackerId, { status: 'rejected', review_note: note.trim() }, ['new']);
 }
 
-// the reason is not kept on the entry: the trigger moves it into tracker_reviews
+// undo keeps review_note on the entry so private.log_tracker_review can copy it into
+// tracker_reviews; the ui only shows the note while status is rejected
 export function undoTrackerReview({ trackerId, note }: TrackerReviewNoteInput): Promise<Tracker> {
   return updateTrackerReview(trackerId, { status: 'new', review_note: note.trim() }, ['approved', 'rejected']);
 }
@@ -259,8 +260,8 @@ export function useDiscardLiveTracker() {
 
 // approving does not change any crew totals (only rejected time is left out), so the crew
 // snapshot stays cached; reject and undo do change them
-export function useApproveTracker() {
-  return useTrackerMutation({ mutationFn: approveTracker, successMessage: content.entryApproved });
+export function useApproveTracker(options?: UseTrackerMutationOptions) {
+  return useTrackerMutation({ mutationFn: approveTracker, successMessage: content.entryApproved, options });
 }
 
 export function useRejectTracker(options?: UseTrackerMutationOptions) {

@@ -13,9 +13,12 @@ import type { CrewMember, CrewViewer } from '@/lib/api/crew';
 import {
   useApproveTracker,
   useMemberTrackers,
+  useRejectTracker,
   useTrackerReviews,
+  useUndoTrackerReview,
   type Tracker,
   type TrackerReview,
+  type TrackerReviewNoteInput,
   type TrackerStatus
 } from '@/lib/api/trackers';
 import content from '../content.json';
@@ -33,9 +36,18 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
   // one request for the whole list; rls returns history only to managers and admins
   const { data: reviews, error: reviewsError } = useTrackerReviews({ userId: member.id, from: range.start, to: range.end });
   const reviewsByTracker = groupReviewsByTracker(reviews ?? []);
-  const approveTracker = useApproveTracker();
   const [noteTarget, setNoteTarget] = useState<ReviewNoteTarget | null>(null);
-  const isMutating = approveTracker.isPending;
+
+  function handleNoteClose() {
+    setNoteTarget(null);
+  }
+
+  // approve accepts the same options as reject/undo; concurrent still invalidates via onSettled
+  const approveTracker = useApproveTracker({ onConcurrentStatusChange: handleNoteClose });
+  // reject/undo live here (not only in the dialog) so row actions stay disabled while a note submit is in flight
+  const rejectTracker = useRejectTracker({ onSuccess: handleNoteClose, onConcurrentStatusChange: handleNoteClose });
+  const undoReview = useUndoTrackerReview({ onSuccess: handleNoteClose, onConcurrentStatusChange: handleNoteClose });
+  const isMutating = approveTracker.isPending || rejectTracker.isPending || undoReview.isPending;
   const memberName = getFullName(member);
   const pendingCount = trackers?.filter((tracker) => tracker.status === 'new' && !isLiveTrackerActive(tracker)).length ?? 0;
 
@@ -59,8 +71,12 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
     setNoteTarget({ tracker, mode: 'undo' });
   }
 
-  function handleNoteClose() {
-    setNoteTarget(null);
+  function handleNoteReject(input: TrackerReviewNoteInput) {
+    rejectTracker.mutate(input);
+  }
+
+  function handleNoteUndo(input: TrackerReviewNoteInput) {
+    undoReview.mutate(input);
   }
 
   return (
@@ -110,6 +126,9 @@ export function MemberTimeReview({ member, viewer, projectNames, memberNames }: 
         target={noteTarget}
         entryLabel={noteTarget ? formatEntryLabel(noteTarget.tracker, getProjectName(noteTarget.tracker)) : ''}
         memberName={memberName}
+        isBusy={rejectTracker.isPending || undoReview.isPending}
+        onReject={handleNoteReject}
+        onUndo={handleNoteUndo}
         onClose={handleNoteClose}
       />
     </section>

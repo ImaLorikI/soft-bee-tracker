@@ -1,6 +1,6 @@
 begin;
 
-select plan(44);
+select plan(46);
 
 -- returns the hint of the error a statement raises (null when it succeeds). the app maps
 -- these stable keys, so tests assert them instead of message text. runs as the caller.
@@ -20,7 +20,11 @@ end;
 $fn$;
 
 -- seeded: admin a01, manager a02 (responsible for b01), worker a03 (assigned to b01).
--- entries are written as a trusted session in the current (open) month
+-- entries are written as a trusted session in the current (open) month.
+-- wipe leftover history from local manual testing so deleted-entry (tracker_id null)
+-- assertions stay deterministic
+delete from public.tracker_reviews;
+
 insert into public.trackers (id, date, duration_minutes, project_id, user_id)
 values
   ('00000000-0000-0000-0000-00000000e001', current_date, 60, '00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a03'),
@@ -38,6 +42,21 @@ insert into public.trackers (id, date, duration_minutes, status, reviewed_by, re
 values
   ('00000000-0000-0000-0000-00000000e007', current_date, 60, 'approved', '00000000-0000-0000-0000-000000000a01', now(),
    '00000000-0000-0000-0000-000000000b01', '00000000-0000-0000-0000-000000000a02');
+
+-- a second manager owns a project a02 does not manage; worker a03 has an entry there
+insert into auth.users (id, email, raw_user_meta_data)
+values ('00000000-0000-0000-0000-00000000f012', 'manager2@review.test', '{"username": "review-manager-two"}');
+
+update public.user_access set role = 'manager' where user_id = '00000000-0000-0000-0000-00000000f012';
+
+insert into public.projects (id, name, manager_id)
+values ('00000000-0000-0000-0000-00000000fb12', 'Review other project', '00000000-0000-0000-0000-00000000f012');
+
+insert into public.project_members (project_id, user_id)
+values ('00000000-0000-0000-0000-00000000fb12', '00000000-0000-0000-0000-000000000a03');
+
+insert into public.trackers (id, date, duration_minutes, project_id, user_id)
+values ('00000000-0000-0000-0000-00000000e009', current_date, 45, '00000000-0000-0000-0000-00000000fb12', '00000000-0000-0000-0000-000000000a03');
 
 set local role authenticated;
 
@@ -177,6 +196,25 @@ select is(
   'tracker_review.reviewed_locked',
   'a manager cannot delete their own admin-approved entry and log it again'
 );
+
+-- rls hides the row: update matches zero rows (no trigger hint), status stays new
+update public.trackers set status = 'approved' where id = '00000000-0000-0000-0000-00000000e009';
+
+select is(
+  (select count(*)::int from public.trackers where id = '00000000-0000-0000-0000-00000000e009'),
+  0,
+  'a manager does not see entries on projects they do not manage'
+);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a01","role":"authenticated","user_role":"admin"}', true);
+
+select is(
+  (select row(status, reviewed_by)::text from public.trackers where id = '00000000-0000-0000-0000-00000000e009'),
+  row('new'::public.tracker_status, null::uuid)::text,
+  'a manager cannot approve an entry on a project they do not manage'
+);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
 
 select is(
   pg_temp.review_hint($$update public.trackers set status = 'new' where id = '00000000-0000-0000-0000-00000000e001'$$),

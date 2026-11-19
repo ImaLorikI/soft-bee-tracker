@@ -279,7 +279,7 @@ describe('tracker review mutations', () => {
     });
 
     await expect(approveTracker('tracker-1')).rejects.toEqual({
-      message: 'Your action was cancelled because the status was changed by someone else or this entry was deleted.',
+      message: "Your action wasn't completed. Refresh to see the reason.",
       statusCode: 406,
       code: 'tracker_review.status_changed'
     });
@@ -317,7 +317,7 @@ describe('tracker write errors', () => {
     const { builder } = mockTrackersTable({ data: null, error: null, status: 200 });
 
     await expect(deleteTracker(runningTracker)).rejects.toEqual({
-      message: 'Your action was cancelled because the status was changed by someone else or this entry was deleted.',
+      message: "Your action wasn't completed. Refresh to see the reason.",
       statusCode: 200,
       code: 'tracker_review.status_changed'
     });

@@ -2,20 +2,21 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Undo2Icon, XIcon } from 'lucide-react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { Button } from '@ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@ui/dialog';
 import { Field, FieldError, FieldLabel } from '@ui/field';
 import { Textarea } from '@ui/textarea';
-import { useRejectTracker, useUndoTrackerReview, type Tracker } from '@/lib/api/trackers';
+import type { Tracker, TrackerReviewNoteInput } from '@/lib/api/trackers';
 import { REVIEW_NOTE_FORM_DEFAULTS, reviewNoteFormSchema, type ReviewNoteFormValues } from '@/lib/schemas/review-note-form.schema';
 import content from '../content.json';
 import { formatText } from '@/lib/format/format-text';
 
 // asks for the reason a review action needs: rejecting an entry or undoing a review.
-// open while `target` is set; the parent clears it to close
-export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: ReviewNoteDialogProps) {
+// open while `target` is set; the parent owns the mutations and clears `target` to close
+export function ReviewNoteDialog({ target, entryLabel, memberName, isBusy, onReject, onUndo, onClose }: ReviewNoteDialogProps) {
   const {
     formState: { errors },
     handleSubmit,
@@ -26,16 +27,15 @@ export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: Re
     resolver: zodResolver(reviewNoteFormSchema)
   });
 
-  function handleDone() {
-    reset(REVIEW_NOTE_FORM_DEFAULTS);
-    onClose();
-  }
+  // clear the note whenever the parent drops `target` (cancel, success, concurrent status)
+  useEffect(() => {
+    if (target === null) {
+      reset(REVIEW_NOTE_FORM_DEFAULTS);
+    }
+  }, [target, reset]);
 
-  const rejectTracker = useRejectTracker({ onSuccess: handleDone, onConcurrentStatusChange: handleDone });
-  const undoReview = useUndoTrackerReview({ onSuccess: handleDone, onConcurrentStatusChange: handleDone });
   const mode: ReviewNoteMode = target?.mode ?? 'reject';
   const copy = content.reviewNoteDialog[mode];
-  const isBusy = rejectTracker.isPending || undoReview.isPending;
   const SubmitIcon = mode === 'reject' ? XIcon : Undo2Icon;
 
   function handleNoteSubmit(values: ReviewNoteFormValues) {
@@ -46,9 +46,9 @@ export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: Re
     const input = { trackerId: target.tracker.id, note: values.note };
 
     if (target.mode === 'reject') {
-      rejectTracker.mutate(input);
+      onReject(input);
     } else {
-      undoReview.mutate(input);
+      onUndo(input);
     }
   }
 
@@ -61,7 +61,6 @@ export function ReviewNoteDialog({ target, entryLabel, memberName, onClose }: Re
       return;
     }
 
-    reset(REVIEW_NOTE_FORM_DEFAULTS);
     onClose();
   }
 
@@ -119,5 +118,8 @@ interface ReviewNoteDialogProps {
   target: ReviewNoteTarget | null;
   entryLabel: string;
   memberName: string;
+  isBusy: boolean;
+  onReject: (input: TrackerReviewNoteInput) => void;
+  onUndo: (input: TrackerReviewNoteInput) => void;
   onClose: () => void;
 }
