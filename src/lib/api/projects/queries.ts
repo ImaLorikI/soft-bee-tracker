@@ -2,8 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { getSessionViewer } from '@/lib/api/auth/viewer';
-import { fetchVisibleProjects } from '@/lib/api/projects/visible-projects';
 import { mapProjectRecordRows, mapProjectsRowsToProjects, PROJECT_COLUMNS, PROJECT_RECORD_COLUMNS } from '@/lib/api/projects/mappers';
 import type { MemberProject, Project, ProjectRecord, ProjectStatus } from '@/lib/api/projects/types';
 import { createBrowserClient } from '@/lib/supabase/client';
@@ -20,30 +18,19 @@ export const projectKeys = {
 
 const STATUS_ORDER: Record<ProjectStatus, number> = { active: 0, archived: 1 };
 
-// admins see every project. everyone else sends the same predicate rls already
-// enforces (responsible or assigned), so postgres does not scan the whole table.
+// visibility is projects_select_visible: admin, responsible, or assigned.
 export async function getProjects(): Promise<Project[]> {
   const supabase = createBrowserClient();
-  const viewer = await getSessionViewer(supabase);
+  const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
 
-  if (!viewer) {
-    return [];
+  if (error) {
+    throw {
+      message: error.message,
+      statusCode: status
+    } satisfies ApiError;
   }
 
-  if (viewer.role === 'admin') {
-    const { data, error, status } = await supabase.from('projects').select(PROJECT_COLUMNS);
-
-    if (error) {
-      throw {
-        message: error.message,
-        statusCode: status
-      } satisfies ApiError;
-    }
-
-    return mapProjectsRowsToProjects(data ?? []);
-  }
-
-  return fetchVisibleProjects(supabase, viewer.id);
+  return mapProjectsRowsToProjects(data ?? []);
 }
 
 export async function getUserProjects(): Promise<Project[]> {
@@ -120,6 +107,7 @@ export function toMemberProjects(projects: Project[], userId: string): MemberPro
     .sort((a, b) => STATUS_ORDER[a.project.status] - STATUS_ORDER[b.project.status] || a.project.name.localeCompare(b.project.name));
 }
 
+// visibility is projects_select_visible: admin, responsible, or assigned.
 export async function getProjectRecords(): Promise<ProjectRecord[]> {
   const supabase = createBrowserClient();
   const { data, error, status } = await supabase.from('projects').select(PROJECT_RECORD_COLUMNS);
@@ -131,7 +119,7 @@ export async function getProjectRecords(): Promise<ProjectRecord[]> {
     } satisfies ApiError;
   }
 
-  return mapProjectRecordRows(data);
+  return mapProjectRecordRows(data ?? []);
 }
 
 export function useProjectRecords() {

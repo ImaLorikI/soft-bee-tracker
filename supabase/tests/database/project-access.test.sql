@@ -1,6 +1,6 @@
 begin;
 
-select plan(36);
+select plan(37);
 
 -- seeded: admin a01, manager a02 (responsible for the seeded projects), worker a03.
 -- two more managers are added here.
@@ -37,6 +37,16 @@ select is(
 select is(
   (select count(*)::int from public.project_rates
    where project_id = '00000000-0000-0000-0000-00000000fb01'),
+  1,
+  'a creating manager who is only a member sees only their own rate'
+);
+
+-- responsible manager sees every rate on the project
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f002","role":"authenticated","user_role":"manager"}', true);
+
+select is(
+  (select count(*)::int from public.project_rates
+   where project_id = '00000000-0000-0000-0000-00000000fb01'),
   2,
   'membership trigger also creates a rate row for each member'
 );
@@ -47,6 +57,9 @@ select is(
   true,
   'a new membership leaves the rate unset'
 );
+
+-- creating manager continues project edits
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
 
 select is(
   (select manager_id::text from public.projects where id = '00000000-0000-0000-0000-00000000fb01'),
@@ -67,6 +80,9 @@ select lives_ok(
     values ('00000000-0000-0000-0000-00000000fb01', '00000000-0000-0000-0000-000000000a03')$$,
   'the creating manager can add members'
 );
+
+-- rate visibility and edits: responsible manager only (not a member-only manager)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f002","role":"authenticated","user_role":"manager"}', true);
 
 select is(
   (select count(*)::int from public.project_rates
@@ -102,7 +118,7 @@ select is(
    where project_id = '00000000-0000-0000-0000-00000000fb01'
      and user_id = '00000000-0000-0000-0000-000000000a03'),
   55.00::numeric,
-  'a project manager can still update a member rate'
+  'the responsible manager can update a member rate'
 );
 
 update public.project_rates set rate = 0
@@ -125,6 +141,9 @@ select throws_ok(
   null,
   'a rate row can only change its rate'
 );
+
+-- creating manager resumes membership and project checks
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000a02","role":"authenticated","user_role":"manager"}', true);
 
 select throws_ok(
   $$update public.project_members set user_id = '00000000-0000-0000-0000-00000000f003'

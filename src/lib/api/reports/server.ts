@@ -9,7 +9,6 @@ import type { ApiError } from '@/types/api-error';
 // imported via '@/lib/api/reports/server' (not the barrel) so client bundles never pull in next/headers.
 // RLS scopes every read to the viewer: projects they see, people they may name, time and leave they may read.
 // Time is summed in the database; the other reads are plain lists and are cut off at the API max_rows (1000).
-// Projects and leave also send an explicit filter so the database does not use rls as the only predicate.
 export async function getReportSource({ from, to }: ReportRangeInput): Promise<ReportSource> {
   const supabase = await createServerClient();
   const [time, leave, projects, people] = await Promise.all([
